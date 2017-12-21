@@ -9,7 +9,7 @@ git -C "$(brew --repo homebrew/core)" fetch --unshallow
 fi
 
 # regular brew installs
-brew install python byobu ctags
+brew install python byobu ctags wget
 
 # cask installs
 brew cask install iterm2 macdown
