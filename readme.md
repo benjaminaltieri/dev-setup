@@ -1,4 +1,4 @@
-#Ben's macOS Development Environment
+#Ben's macOS Development Environment for Swift
 
 ##Downloads
 These will be installed from downloads:
@@ -73,3 +73,28 @@ fi
 ```
 
 [Ref](http://mkelsey.com/2013/04/30/how-i-setup-virtualenv-and-virtualenvwrapper-on-my-mac/)
+
+###Special packages
+Some key packages with setup steps:
+
+- awscli - I install and configure in a virtualenv.
+
+```bash
+$ mkvirtualenv aws_env
+...
+(aws_env) $ pip install --upgrade awscli
+...
+(aws_env) $ aws --version
+aws-cli/1.14.14 Python/2.7.14 Darwin/17.3.0 botocore/1.8.18
+(aws_env) $ aws configure
+AWS Access Key ID [None]: ******
+AWS Secret Access Key [None]: ******
+Default region name [None]: us-west-2
+Default output format [None]:
+(aws_env) $ deactivate
+$ echo 'all done!'
+all done!
+```
+
+##Swift Specific Setup Steps
+placeholder

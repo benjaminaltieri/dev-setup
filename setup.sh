@@ -57,6 +57,12 @@ codeblock
 source ~/.bash_profile
 virtualenvwrapper
 
+# create a special env for aws stuff
+mkvirtualenv aws_env
+pip install --upgrade awscli
+aws --version
+deactivate
+
 # setup dotvim
 if [ -d .vim ]; then
     rm -rf .vim
