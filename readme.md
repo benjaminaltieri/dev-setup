@@ -7,6 +7,8 @@ Chrome: [https://www.google.com/chrome/browser/]()
 
 iTerm2: [https://www.iterm2.com/index.html]() (optionally `brew cask install iterm2` after `brew` is setup)
 
+Docker: [https://docs.docker.com/docker-for-mac/install/#download-docker-for-mac]()
+
 ##Brew
 To install `brew`, run the following commands (assumes xcode not installed):
 
