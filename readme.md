@@ -53,7 +53,7 @@ To manage per repository python package dependencies we use `virtualenv`, which 
 $ pip install virtualenv virtualenvwrapper
 ```
 
-Then in order to activate the wrapper, add these lines to your `.bash_profile`:
+Then in order to activate the wrapper, add these lines to your  `.bash_profile` or `.bashrc`:
 
 ```bash
 # set where virtual environments will live
