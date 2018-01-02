@@ -18,13 +18,22 @@ brew cask install iterm2 macdown
 pushd ~
 cp $SCRIPT_DIR/.gitconfig .
 
-# special for python, add the homebrew version into path
-if ! [ -f ~/.bash_profile ]; then
-    touch ~/.bash_profile
+# let's create our bash dot files and route correctly
+BASH_PROFILE=~/.bash_profile
+BASHRC=~/.bashrc
+if ! [ -f $BASH_PROFILE ]; then
+    touch $BASH_PROFILE
+    chmod 700 $BASH_PROFILE
 fi
-echo 'export PATH="/usr/local/opt/python/libexec/bin:$PATH"' >> ~/.bash_profile
+echo "[ -r $BASHRC ] && . $BASHRC" >> $BASH_PROFILE
+if ! [ -f $BASHRC ]; then
+    touch $BASHRC
+    chmod 700 $BASHRC
+fi
+# special for python, add the homebrew version into path
+echo 'export PATH="/usr/local/opt/python/libexec/bin:$PATH"' >> $BASHRC
 # test it
-source ~/.bash_profile
+source $BASHRC
 BREW_PYTHON="$(command -v python)"
 echo $BREW_PYTHON
 python --version
@@ -36,7 +45,7 @@ echo $VIRTUALENV_BIN
 
 # virtualenvwrapper requires some more setup
 # courtesy of http://mkelsey.com/2013/04/30/how-i-setup-virtualenv-and-virtualenvwrapper-on-my-mac/
-cat >> ~/.bash_profile <<'codeblock'
+cat >> $BASHRC <<'codeblock'
 # set where virtual environments will live
 export WORKON_HOME=$HOME/.virtualenvs
 # we have a special install, so set these as well
@@ -54,15 +63,16 @@ else
 	echo "WARNING: Can't find virtualenvwrapper.sh"
 fi
 codeblock
-source ~/.bash_profile
+source $BASH_PROFILE
 virtualenvwrapper
 
 # setup dotvim
-if [ -d .vim ]; then
-    rm -rf .vim
+DOTVIM=~/.vim
+if [ -d $DOTVIM ]; then
+    rm -rf $DOTVIM
 fi
-git clone https://github.com/benjaminaltieri/dotvim .vim
-pushd .vim
+git clone https://github.com/benjaminaltieri/dotvim $DOTVIM
+pushd $DOTVIM
 ./setup.sh
 popd
 
