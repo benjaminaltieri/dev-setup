@@ -32,6 +32,46 @@ These can be installed with `brew cask install`:
 * `iterm2` - modern terminal replacement for macOS `terminal`
 * `macdown` - markdown editor with realtime rendering
 
+##Byobu Configuration for macOS and iTerm2
+Following the steps referenced [here](https://stackoverflow.com/a/26470118) we can get the proper shortcut forwarding that byobu expects.
+
+So far this is manual, maybe improve with script ([ref.](https://apple.stackexchange.com/a/115799)), but the gist is:
+
+1. Remove built-in macOS shortcuts that use F1-F12
+2. Manually edit iTerm2 profile to use linux terminal type and configure these shortcuts with the 'Send Escape Sequence' option:
+	
+ -  <kbd>CTRL</kbd> + <kbd>F2</kbd> : `[1;5Q`
+ -  <kbd>CTRL</kbd> + <kbd>SHIFT</kbd> + <kbd>F2</kbd> : `[1;6Q`
+ -  <kbd>ALT</kbd> + <kbd>LEFT</kbd> : `[1;3D`
+ -  <kbd>ALT</kbd> + <kbd>RIGHT</kbd> : `[1;3C`
+ -  <kbd>ALT</kbd> + <kbd>UP</kbd> : `[1;3A`
+ -  <kbd>ALT</kbd> + <kbd>DOWN</kbd> : `[1;3B`
+ -  <kbd>CTRL</kbd> + <kbd>F3</kbd> : `[1;5R`
+ -  <kbd>CTRL</kbd> + <kbd>F4</kbd> : `[1;5S`
+ -  <kbd>CTRL</kbd> + <kbd>SHIFT</kbd> + F3 : `[1;6R`
+ -  <kbd>CTRL</kbd> + <kbd>SHIFT</kbd> + F4 : `[1;6S`
+ -  <kbd>SHIFT</kbd> + <kbd>ALT</kbd> + <kbd>LEFT</kbd> : `[1;4D`
+ -  <kbd>SHIFT</kbd> + <kbd>ALT</kbd> + <kbd>RIGHT</kbd> : `[1;4C`
+ -  <kbd>SHIFT</kbd> + <kbd>ALT</kbd> + <kbd>UP</kbd> : `[1;4A`
+ -  <kbd>SHIFT</kbd> + <kbd>ALT</kbd> + <kbd>DOWN</kbd> : `[1;4B`
+ -  <kbd>CTRL</kbd> + <kbd>F5</kbd> : `[15;5~`
+ -  <kbd>CTRL</kbd> + <kbd>SHIFT</kbd> + <kbd>F5</kbd> : `[15;6~`
+ -  <kbd>ALT</kbd> + <kbd>F6</kbd> : `[17;3~`
+ -  <kbd>CTRL</kbd> + <kbd>F6</kbd> : `[17;5~`
+ -  <kbd>ALT</kbd> + <kbd>PPAGE</kbd> : `[5;3~`
+ -  <kbd>ALT</kbd> + <kbd>NPAGE</kbd> : `[6;3~`
+ -  <kbd>CTRL</kbd> + <kbd>F8</kbd> : `[19;5~`
+ -  <kbd>ALT</kbd> + <kbd>SHIFT</kbd> + <kbd>F8</kbd> : `[19;4~`
+ -  <kbd>CTRL</kbd> + <kbd>SHIFT</kbd> + <kbd>F8</kbd> : `[19;6~`
+ -  <kbd>CTRL</kbd> + <kbd>F9</kbd> : `[20;5~`
+ -  <kbd>ALT</kbd> + <kbd>F11</kbd> : `[23;3~`
+ -  <kbd>CTRL</kbd> + <kbd>F11</kbd> : `[23;5~`
+ -  <kbd>ALT</kbd> + <kbd>F12</kbd> : `[24;3~`
+ -  <kbd>CTRL</kbd> + <kbd>F12</kbd> : `[24;5~`
+ -  <kbd>ALT</kbd> + <kbd>INS</kbd>: `[2;3~`
+ 
+ Possibly getting [this](http://stratus3d.com/blog/2015/02/28/sync-iterm2-profile-with-dotfiles-repository/) to work, needs testing.
+
 
 ##VIM Setup
 My dotvim configuration can be cloned from github. The procedure is as follows:

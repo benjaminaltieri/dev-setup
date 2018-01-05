@@ -14,6 +14,13 @@ brew install python byobu ctags wget
 # cask installs
 brew cask install iterm2 macdown
 
+# iTerm2 Configuration - NEEDS TESTING MAY NOT WORK
+ITERM2_PREF_DIR=$SCRIPT_DIR
+# Specify the preferences directory
+defaults write com.googlecode.iterm2.plist PrefsCustomFolder -string "SITERM2_PREF_DIR"
+# Tell iTerm2 to use the custom preferences in the directory
+defaults write com.googlecode.iterm2.plist LoadPrefsFromCustomFolder -bool true
+
 # start home folder modifications
 pushd ~
 cp $SCRIPT_DIR/.gitconfig .
