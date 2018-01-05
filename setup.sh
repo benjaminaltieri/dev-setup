@@ -38,6 +38,9 @@ BREW_PYTHON="$(command -v python)"
 echo $BREW_PYTHON
 python --version
 
+# add alias for swift github PAK
+echo 'alias gitpass="lpass show -c --password 2579574792068648592"' >> $BASHRC
+
 # installs via pip
 pip install virtualenv virtualenvwrapper
 VIRTUALENV_BIN="$(command -v virtualenv)"
