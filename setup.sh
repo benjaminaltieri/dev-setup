@@ -11,6 +11,9 @@ fi
 # regular brew installs
 brew install python byobu ctags wget
 
+# one liners with options
+brew install lastpass-cli --with-pinentry --with-doc
+
 # cask installs
 brew cask install iterm2 macdown
 
