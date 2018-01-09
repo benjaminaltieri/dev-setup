@@ -48,6 +48,10 @@ BREW_PYTHON="$(command -v python)"
 echo $BREW_PYTHON
 python --version
 
+# git bash completion
+curl https://raw.githubusercontent.com/git/git/master/contrib/completion/git-completion.bash -o /usr/local/etc/git_completion
+echo '[ -f /usr/local/etc/git_completion ] && . /usr/local/etc/git_completion' >> $BASHRC
+
 # installs via pip
 pip install virtualenv virtualenvwrapper
 VIRTUALENV_BIN="$(command -v virtualenv)"
