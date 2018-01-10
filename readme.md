@@ -27,6 +27,7 @@ These can be installed with `brew install`:
 * `byobu` - terminal mux front end for tmux/screen
 * `ctags` - source tagging
 * `lastpass-cli --with-pinentry --withdoc` - lastpass in the command line for use with github 2FA PAKs
+* `check` - Unit testing framework for C
 
 These can be installed with `brew cask install`:
 

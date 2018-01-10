@@ -14,6 +14,9 @@ brew install python byobu ctags wget
 # one liners with options
 brew install lastpass-cli --with-pinentry --with-doc
 
+# swift specific installs via brew
+brew install check
+
 # cask installs
 brew cask install iterm2 macdown
 
