@@ -1,3 +1,8 @@
 [user]
     name = Benjamin Altieri
     email = benaltieri@gmail.com
+[alias]
+	pn = "push -u"
+	au = "add -u"
+[push]
+	default = current

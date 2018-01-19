@@ -25,6 +25,7 @@ These can be installed with `brew install`:
 * `byobu` - terminal mux front end for tmux/screen
 * `ctags` - source tagging
 * `lastpass-cli --with-pinentry --withdoc` - lastpass in the command line for use with github 2FA PAKs
+* `gdb --with-all-targets --with-python` - for debugging with support for ARM targets
 
 These can be installed with `brew cask install`:
 
@@ -114,3 +115,12 @@ fi
 ```
 
 [Ref](http://mkelsey.com/2013/04/30/how-i-setup-virtualenv-and-virtualenvwrapper-on-my-mac/)
+
+###Git Aliases
+* `pn` - push the current branch with the -u option to set up tracking (stands for 'push new')
+* `au` - add previously tracked files to index (add -u)
+
+###GDB Setup
+You must codesign the binary following the [instructions](https://sourceware.org/gdb/wiki/BuildingOnDarwin).
+
+Add this line: `echo "set startup-with-shell off" >> ~/.gdbinit`

@@ -13,6 +13,7 @@ brew install python byobu ctags wget
 
 # one liners with options
 brew install lastpass-cli --with-pinentry --with-doc
+brew install gdb --with-all-targets --with-python
 
 # cask installs
 brew cask install iterm2 macdown
@@ -79,6 +80,9 @@ fi
 codeblock
 source $BASH_PROFILE
 virtualenvwrapper
+
+# GDB config stuff for macOS
+echo "set startup-with-shell off" >> ~/.gdbinit
 
 # setup dotvim
 DOTVIM=~/.vim
