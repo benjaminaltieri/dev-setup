@@ -2,6 +2,7 @@
     name = Benjamin Altieri
     email = benaltieri@gmail.com
 [alias]
+	cob = "!f(){ git checkout -b benaltieri/$1; }; f"
 	pn = "push -u"
 	au = "add -u"
 [push]

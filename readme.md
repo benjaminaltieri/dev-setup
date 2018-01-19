@@ -144,6 +144,7 @@ all done!
 ##Swift Specific Setup Steps
 
 ###Git Aliases
+* `cob` - checkout new branch with the username/(input to cob command) format
 * `pn` - push the current branch with the -u option to set up tracking (stands for 'push new')
 * `au` - add previously tracked files to index (add -u)
 
