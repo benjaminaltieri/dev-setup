@@ -1,13 +1,13 @@
-#Ben's macOS Development Environment
+# Ben's macOS Development Environment
 
-##Downloads
+## Downloads
 These will be installed from downloads:
 
 Chrome: [https://www.google.com/chrome/browser/]()
 
 iTerm2: [https://www.iterm2.com/index.html]() (optionally `brew cask install iterm2` after `brew` is setup)
 
-##Brew
+## Brew
 To install `brew`, run the following commands (assumes xcode not installed):
 
 ```bash
@@ -17,7 +17,7 @@ $ /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/inst
 
 [Reference](https://brew.sh/)
 
-###Brew Installs:
+### Brew Installs:
 
 These can be installed with `brew install`:
 
@@ -32,7 +32,7 @@ These can be installed with `brew cask install`:
 * `iterm2` - modern terminal replacement for macOS `terminal`
 * `macdown` - markdown editor with realtime rendering
 
-##Byobu Configuration for macOS and iTerm2
+## Byobu Configuration for macOS and iTerm2
 Following the steps referenced [here](https://stackoverflow.com/a/26470118) we can get the proper shortcut forwarding that byobu expects.
 
 So far this is manual, maybe improve with script ([ref.](https://apple.stackexchange.com/a/115799)), but the gist is:
@@ -73,7 +73,7 @@ So far this is manual, maybe improve with script ([ref.](https://apple.stackexch
  Possibly getting [this](http://stratus3d.com/blog/2015/02/28/sync-iterm2-profile-with-dotfiles-repository/) to work, needs testing.
 
 
-##VIM Setup
+## VIM Setup
 My dotvim configuration can be cloned from github. The procedure is as follows:
 
 ```bash
@@ -83,10 +83,10 @@ $ cd ~/.vim
 $ ./setup.sh
 ```
 
-##Python
+## Python
 Python is installed by homebrew (or by default macOS if you chose not to install it) but we need some other tools to make our python world a bit easier:
 
-###Virtualenv and virtualenvwrapper
+### Virtualenv and virtualenvwrapper
 To manage per repository python package dependencies we use `virtualenv`, which is pip installable:
 
 ```bash
@@ -116,11 +116,11 @@ fi
 
 [Ref](http://mkelsey.com/2013/04/30/how-i-setup-virtualenv-and-virtualenvwrapper-on-my-mac/)
 
-###Git Aliases
+### Git Aliases
 * `pn` - push the current branch with the -u option to set up tracking (stands for 'push new')
 * `au` - add previously tracked files to index (add -u)
 
-###GDB Setup
+### GDB Setup
 You must codesign the binary following the [instructions](https://sourceware.org/gdb/wiki/BuildingOnDarwin).
 
 Add this line: `echo "set startup-with-shell off" >> ~/.gdbinit`
