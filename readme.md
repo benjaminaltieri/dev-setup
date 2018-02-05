@@ -119,6 +119,7 @@ fi
 ### Git Aliases
 * `pn` - push the current branch with the -u option to set up tracking (stands for 'push new')
 * `au` - add previously tracked files to index (add -u)
+* `bdel` - delete branch locally and remotely (as long as they share the same name)
 
 ### GDB Setup
 You must codesign the binary following the [instructions](https://sourceware.org/gdb/wiki/BuildingOnDarwin).
