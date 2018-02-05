@@ -1,11 +1,11 @@
 [user]
-    name = Benjamin Altieri
-    email = benaltieri@gmail.com
+	name = Benjamin Altieri
+	email = benaltieri@gmail.com
 [alias]
 	cob = "!f(){ git checkout -b benaltieri/$1; }; f"
 	pn = "push -u"
 	au = "add -u"
-    bdel = "!f() { git branch -d ${1} && git push origin --delete ${1}; }; f"
+	bdel = "!f() { git branch -d ${1} && git push origin --delete ${1}; }; f"
 [push]
 	default = current
 [fetch]
