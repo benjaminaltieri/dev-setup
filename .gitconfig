@@ -4,12 +4,23 @@
 [core]
     editor = vim
 [alias]
-	cob = "!f(){ git checkout -b benaltieri/$1; }; f"
-	pn = "push -u"
 	au = "add -u"
 	bdel = "!f() { git branch -D ${1} && git push origin --delete ${1}; }; f"
     bname = "rev-parse --abbrev-ref HEAD"
     bnamel = "!f() { git bname | tr '[:upper:]' '[:lower:]'; }; f"
+    c = "commit -v"
+    ca = "commit -av"
+    co = "checkout"
+    cob = "!f(){ git checkout -b benaltieri/$1; }; f"
+    conflicts = "!$EDITOR $(git diff --name-only --diff-filter=U)"
+    f = "push --force-with-lease"
+    fix = "commit --amend -v"
+    logs = "log --color --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit --"
+    m = "merge --ff-only"
+    mm = "merge --ff-only -"
+    pn = "push -u"
+    s = "status"
+    st = "status -sb"
 [push]
     default = current
 [color]
