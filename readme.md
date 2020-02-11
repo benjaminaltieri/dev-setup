@@ -1,77 +1,29 @@
-# Ben's macOS Development Environment
+# Ben's Linux Development Environment
 
 ## Downloads
 These will be installed from downloads:
 
 Chrome: [https://www.google.com/chrome/browser/]()
 
-iTerm2: [https://www.iterm2.com/index.html]() (optionally `brew cask install iterm2` after `brew` is setup)
+### Aptitude Installs:
 
-## Brew
-To install `brew`, run the following commands (assumes xcode not installed):
+These can be installed with `sudo apt-get install`:
 
-```bash
-$ xcode-select --install
-$ /usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
-```
-
-[Reference](https://brew.sh/)
-
-### Brew Installs:
-
-These can be installed with `brew install`:
-
-* `python` - brew's version of python with is usually more recent than the default python supplied by macOS. 
+* `build-essential` - essential build tools
 * `byobu` - terminal mux front end for tmux/screen
-* `ctags` - source tagging
-* `lastpass-cli --with-pinentry --withdoc` - lastpass in the command line for use with github 2FA PAKs
-* `gdb --with-all-targets --with-python` - for debugging with support for ARM targets
+* `cmake` - build script generation
+* `exuberant-ctags` - source tagging
+* `git` - the git version control tool
+* `vim` - vi improved
 
-These can be installed with `brew cask install`:
+### Snappy Installs:
 
-* `iterm2` - modern terminal replacement for macOS `terminal`
-* `macdown` - markdown editor with realtime rendering
+These can be installed with `snap install`:
 
-## Byobu Configuration for macOS and iTerm2
-Following the steps referenced [here](https://stackoverflow.com/a/26470118) we can get the proper shortcut forwarding that byobu expects.
+* `hub` - unofficial github cli
 
-So far this is manual, maybe improve with script ([ref.](https://apple.stackexchange.com/a/115799)), but the gist is:
-
-1. Remove built-in macOS shortcuts that use F1-F12
-2. Manually edit iTerm2 profile to use linux terminal type and configure these shortcuts with the 'Send Escape Sequence' option:
-	
- -  <kbd>CTRL</kbd> + <kbd>F2</kbd> : `[1;5Q`
- -  <kbd>CTRL</kbd> + <kbd>SHIFT</kbd> + <kbd>F2</kbd> : `[1;6Q`
- -  <kbd>ALT</kbd> + <kbd>LEFT</kbd> : `[1;3D`
- -  <kbd>ALT</kbd> + <kbd>RIGHT</kbd> : `[1;3C`
- -  <kbd>ALT</kbd> + <kbd>UP</kbd> : `[1;3A`
- -  <kbd>ALT</kbd> + <kbd>DOWN</kbd> : `[1;3B`
- -  <kbd>CTRL</kbd> + <kbd>F3</kbd> : `[1;5R`
- -  <kbd>CTRL</kbd> + <kbd>F4</kbd> : `[1;5S`
- -  <kbd>CTRL</kbd> + <kbd>SHIFT</kbd> + F3 : `[1;6R`
- -  <kbd>CTRL</kbd> + <kbd>SHIFT</kbd> + F4 : `[1;6S`
- -  <kbd>SHIFT</kbd> + <kbd>ALT</kbd> + <kbd>LEFT</kbd> : `[1;4D`
- -  <kbd>SHIFT</kbd> + <kbd>ALT</kbd> + <kbd>RIGHT</kbd> : `[1;4C`
- -  <kbd>SHIFT</kbd> + <kbd>ALT</kbd> + <kbd>UP</kbd> : `[1;4A`
- -  <kbd>SHIFT</kbd> + <kbd>ALT</kbd> + <kbd>DOWN</kbd> : `[1;4B`
- -  <kbd>CTRL</kbd> + <kbd>F5</kbd> : `[15;5~`
- -  <kbd>CTRL</kbd> + <kbd>SHIFT</kbd> + <kbd>F5</kbd> : `[15;6~`
- -  <kbd>ALT</kbd> + <kbd>F6</kbd> : `[17;3~`
- -  <kbd>CTRL</kbd> + <kbd>F6</kbd> : `[17;5~`
- -  <kbd>ALT</kbd> + <kbd>PPAGE</kbd> : `[5;3~`
- -  <kbd>ALT</kbd> + <kbd>NPAGE</kbd> : `[6;3~`
- -  <kbd>CTRL</kbd> + <kbd>F8</kbd> : `[19;5~`
- -  <kbd>ALT</kbd> + <kbd>SHIFT</kbd> + <kbd>F8</kbd> : `[19;4~`
- -  <kbd>CTRL</kbd> + <kbd>SHIFT</kbd> + <kbd>F8</kbd> : `[19;6~`
- -  <kbd>CTRL</kbd> + <kbd>F9</kbd> : `[20;5~`
- -  <kbd>ALT</kbd> + <kbd>F11</kbd> : `[23;3~`
- -  <kbd>CTRL</kbd> + <kbd>F11</kbd> : `[23;5~`
- -  <kbd>ALT</kbd> + <kbd>F12</kbd> : `[24;3~`
- -  <kbd>CTRL</kbd> + <kbd>F12</kbd> : `[24;5~`
- -  <kbd>ALT</kbd> + <kbd>INS</kbd>: `[2;3~`
- 
- Possibly getting [this](http://stratus3d.com/blog/2015/02/28/sync-iterm2-profile-with-dotfiles-repository/) to work, needs testing.
-
+### Install rustup
+```curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh```
 
 ## VIM Setup
 My dotvim configuration can be cloned from github. The procedure is as follows:
@@ -84,13 +36,13 @@ $ ./setup.sh
 ```
 
 ## Python
-Python is installed by homebrew (or by default macOS if you chose not to install it) but we need some other tools to make our python world a bit easier:
+Python is installed by default in Linux but we need some other tools to make our python world a bit easier:
 
 ### Virtualenv and virtualenvwrapper
 To manage per repository python package dependencies we use `virtualenv`, which is pip installable:
 
 ```bash
-$ pip install virtualenv virtualenvwrapper
+$ pip3 install virtualenv virtualenvwrapper
 ```
 
 Then in order to activate the wrapper, add these lines to your  `.bash_profile` or `.bashrc`:
@@ -99,7 +51,7 @@ Then in order to activate the wrapper, add these lines to your  `.bash_profile` 
 # set where virtual environments will live
 export WORKON_HOME=$HOME/.virtualenvs
 # we have a special install, so set these as well
-export VIRTUALENVWRAPPER_PYTHON="$(command -v python)"
+export VIRTUALENVWRAPPER_PYTHON="$(command -v python3)"
 export VIRTUALENVWRAPPER_VIRTUALENV="$(command -v virtualenv)"
 # ensure all new environments are isolated from the site-packages directory
 export VIRTUALENVWRAPPER_VIRTUALENV_ARGS='--no-site-packages'
@@ -107,10 +59,10 @@ export VIRTUALENVWRAPPER_VIRTUALENV_ARGS='--no-site-packages'
 export PIP_VIRTUALENV_BASE=$WORKON_HOME
 # makes pip detect an active virtualenv and install to it
 export PIP_RESPECT_VIRTUALENV=true
-if [[ -r /usr/local/bin/virtualenvwrapper.sh ]]; then
-    source /usr/local/bin/virtualenvwrapper.sh
+if [[ -r ~/.local/bin/virtualenvwrapper.sh ]]; then
+	source ~/.local/bin/virtualenvwrapper.sh
 else
-    echo "WARNING: Can't find virtualenvwrapper.sh"
+	echo "WARNING: Can't find virtualenvwrapper.sh"
 fi
 ```
 
@@ -121,7 +73,3 @@ fi
 * `au` - add previously tracked files to index (add -u)
 * `bdel` - delete branch locally and remotely (as long as they share the same name)
 
-### GDB Setup
-You must codesign the binary following the [instructions](https://sourceware.org/gdb/wiki/BuildingOnDarwin).
-
-Add this line: `echo "set startup-with-shell off" >> ~/.gdbinit`
