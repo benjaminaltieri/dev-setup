@@ -9,7 +9,7 @@ git -C "$(brew --repo homebrew/core)" fetch --unshallow
 fi
 
 # regular brew installs
-brew install python byobu ctags wget
+brew install python byobu ctags wget shellcheck
 
 # one liners with options
 brew install lastpass-cli --with-pinentry --with-doc
