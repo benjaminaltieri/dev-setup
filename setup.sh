@@ -4,15 +4,16 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 # apt installs
 sudo apt-get update
 sudo apt-get install -y \
-	build-essential \
-	byobu \
-	cmake \
-	exuberant-ctags \
-	git \
-	python-pip \
-	python3-pip \
-	vim \
-	virtualenv \
+    build-essential \
+    byobu \
+    cmake \
+    exuberant-ctags \
+    git \
+    gnome-tweak-tool \
+    python-pip \
+    python3-pip \
+    vim \
+    virtualenv \
 
 
 # snappy installs
@@ -61,9 +62,9 @@ export PIP_VIRTUALENV_BASE=$WORKON_HOME
 # makes pip detect an active virtualenv and install to it
 export PIP_RESPECT_VIRTUALENV=true
 if [[ -r ~/.local/bin/virtualenvwrapper.sh ]]; then
-	source ~/.local/bin/virtualenvwrapper.sh
+    source ~/.local/bin/virtualenvwrapper.sh
 else
-	echo "WARNING: Can't find virtualenvwrapper.sh"
+    echo "WARNING: Can't find virtualenvwrapper.sh"
 fi
 codeblock
 

@@ -1,4 +1,5 @@
 # Ben's Linux Development Environment
+Targeting Ubuntu Bionic 18.04
 
 ## Downloads
 These will be installed from downloads:
@@ -14,6 +15,7 @@ These can be installed with `sudo apt-get install`:
 * `cmake` - build script generation
 * `exuberant-ctags` - source tagging
 * `git` - the git version control tool
+* `gnome-tweak-tool` - used to map caps lock to esc
 * `vim` - vi improved
 
 ### Snappy Installs:
@@ -21,6 +23,10 @@ These can be installed with `sudo apt-get install`:
 These can be installed with `snap install`:
 
 * `hub` - unofficial github cli
+
+### Remap caps lock to escape
+From [this](https://askubuntu.com/questions/1059663/remapping-caps-lock-to-escape-in-ubuntu-18-04-bionic) post:
+Gnome Tweaks -> Keyboard & Mouse -> Additional Layout Options -> Caps Lock key behavior.
 
 ### Install rustup
 ```curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh```
