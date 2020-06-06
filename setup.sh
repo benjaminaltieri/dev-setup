@@ -51,6 +51,10 @@ python --version
 # add alias for swift github PAK
 echo 'alias gitpass="lpass show -c --password 2579574792068648592"' >> $BASHRC
 
+# git bash completion
+curl https://raw.githubusercontent.com/git/git/master/contrib/completion/git-completion.bash -o /usr/local/etc/git_completion
+echo '[ -f /usr/local/etc/git_completion ] && . /usr/local/etc/git_completion' >> $BASHRC
+
 # installs via pip
 pip install virtualenv virtualenvwrapper
 VIRTUALENV_BIN="$(command -v virtualenv)"
