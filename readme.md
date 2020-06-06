@@ -28,6 +28,7 @@ These can be installed with `brew install`:
 * `ctags` - source tagging
 * `lastpass-cli --with-pinentry --withdoc` - lastpass in the command line for use with github 2FA PAKs
 * `check` - Unit testing framework for C
+* `gdb --with-all-targets --with-python` - for debugging with support for ARM targets
 
 These can be installed with `brew cask install`:
 
@@ -141,4 +142,12 @@ all done!
 ```
 
 ##Swift Specific Setup Steps
-placeholder
+
+###Git Aliases
+* `pn` - push the current branch with the -u option to set up tracking (stands for 'push new')
+* `au` - add previously tracked files to index (add -u)
+
+###GDB Setup
+You must codesign the binary following the [instructions](https://sourceware.org/gdb/wiki/BuildingOnDarwin).
+
+Add this line: `echo "set startup-with-shell off" >> ~/.gdbinit`

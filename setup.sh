@@ -13,6 +13,7 @@ brew install python byobu ctags wget
 
 # one liners with options
 brew install lastpass-cli --with-pinentry --with-doc
+brew install gdb --with-all-targets --with-python
 
 # swift specific installs via brew
 brew install check
@@ -91,6 +92,9 @@ mkvirtualenv aws_env
 pip install --upgrade awscli
 aws --version
 deactivate
+
+# GDB config stuff for macOS
+echo "set startup-with-shell off" >> ~/.gdbinit
 
 # setup dotvim
 DOTVIM=~/.vim
