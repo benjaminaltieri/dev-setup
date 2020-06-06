@@ -18,12 +18,14 @@
 	<string>manual</string>
 	<key>Default Bookmark Guid</key>
 	<string>8B0BD435-4157-43CD-AC76-13CF2EA198F9</string>
+	<key>HapticFeedbackForEsc</key>
+	<false/>
 	<key>HotkeyMigratedFromSingleToMulti</key>
 	<true/>
 	<key>LoadPrefsFromCustomFolder</key>
 	<true/>
 	<key>NSNavLastRootDirectory</key>
-	<string>~/Swift/dev-env-macos</string>
+	<string>~/Misc/dev-env-macos</string>
 	<key>NSNavPanelExpandedSizeForOpenMode</key>
 	<string>{712, 448}</string>
 	<key>NSQuotedKeystrokeBinding</key>
@@ -34,6 +36,11 @@
 	<false/>
 	<key>NSScrollViewShouldScrollUnderTitlebar</key>
 	<false/>
+	<key>NSSplitView Subview Frames NSColorPanelSplitView</key>
+	<array>
+		<string>0.000000, 0.000000, 224.000000, 263.000000, NO, NO</string>
+		<string>0.000000, 264.000000, 224.000000, 43.000000, NO, NO</string>
+	</array>
 	<key>NSTableView Columns v2 KeyBingingTable</key>
 	<data>
 	YnBsaXN0MDDUAQIDBAUGNjdYJHZlcnNpb25YJG9iamVjdHNZJGFyY2hpdmVyVCR0b3AS
@@ -41,7 +48,7 @@
 	gAKACoAN0xAJChEVGVdOUy5rZXlzoxITFIADgASABaMWFxiABoAHgAiACVpJZGVudGlm
 	aWVyVVdpZHRoVkhpZGRlblEwI0BowAAAAAAACNIhIiMkWiRjbGFzc25hbWVYJGNsYXNz
 	ZXNcTlNEaWN0aW9uYXJ5oiMlWE5TT2JqZWN00xAJCicrGaMSExSAA4AEgAWjLC0YgAuA
-	DIAIgAlRMSNAc7Gdsi0OVtIhIjM0Xk5TTXV0YWJsZUFycmF5ozM1JVdOU0FycmF5XxAP
+	DIAIgAlRMSNAdKGdsi0OVtIhIjM0Xk5TTXV0YWJsZUFycmF5ozM1JVdOU0FycmF5XxAP
 	TlNLZXllZEFyY2hpdmVy0Tg5VUFycmF5gAEACAARABoAIwAtADIANwBGAEwAUQBcAGMA
 	ZgBoAGoAbABzAHsAfwCBAIMAhQCJAIsAjQCPAJEAnACiAKkAqwC0ALUAugDFAM4A2wDe
 	AOcA7gDyAPQA9gD4APwA/gEAAQIBBAEGAQ8BFAEjAScBLwFBAUQBSgAAAAAAAAIBAAAA
@@ -63,19 +70,19 @@
 		<integer>1</integer>
 	</dict>
 	<key>NSWindow Frame SUUpdateAlert</key>
-	<string>970 768 620 392 0 0 2560 1417 </string>
+	<string>650 498 620 392 0 0 1920 1057 </string>
 	<key>NSWindow Frame SharedPreferences</key>
 	<string>92 925 796 473 0 0 2560 1417 </string>
 	<key>NSWindow Frame iTerm Window 0</key>
-	<string>281 631 570 452 0 0 2560 1417 </string>
+	<string>0 325 585 452 0 0 1440 900 </string>
 	<key>NSWindow Frame iTerm Window 1</key>
-	<string>0 425 570 452 0 0 2560 1440 </string>
+	<string>0 115 1440 707 0 0 1440 877 </string>
 	<key>NSWindow Frame iTerm Window 2</key>
-	<string>477 202 1117 707 0 0 1920 1057 </string>
+	<string>0 325 585 452 0 0 1440 900 </string>
 	<key>NSWindow Frame iTerm Window 3</key>
-	<string>11 142 1165 656 0 0 1440 877 </string>
+	<string>28 38 1228 690 0 0 1440 877 </string>
 	<key>NSWindow Frame iTerm Window 4</key>
-	<string>260 240 1131 673 0 0 1920 1057 </string>
+	<string>0 17 1397 860 0 0 1440 877 </string>
 	<key>New Bookmarks</key>
 	<array>
 		<dict>
@@ -848,17 +855,25 @@
 	<key>NoSyncAllAppVersions</key>
 	<array>
 		<string>3.3.2</string>
+		<string>3.3.9</string>
 		<string>3.3.1</string>
 		<string>3.3.8</string>
 		<string>3.2.7</string>
 		<string>3.3.6</string>
 	</array>
+	<key>NoSyncFrame_SharedPreferences</key>
+	<dict>
+		<key>screenFrame</key>
+		<string>{{0, 0}, {1440, 900}}</string>
+		<key>topLeft</key>
+		<string>{398, 727}</string>
+	</dict>
 	<key>NoSyncHaveWarnedAboutPasteConfirmationChange</key>
 	<true/>
 	<key>NoSyncInstallationId</key>
 	<string>57A410DF-2DB0-4B70-ABC5-AEBB6117F8B5</string>
 	<key>NoSyncLaunchExperienceControllerRunCount</key>
-	<integer>26</integer>
+	<integer>32</integer>
 	<key>NoSyncNeverAskAboutSettingAlternateMouseScroll</key>
 	<true/>
 	<key>NoSyncNextAnnoyanceTime</key>
@@ -1621,14 +1636,20 @@
 	<key>SUHasLaunchedBefore</key>
 	<true/>
 	<key>SULastCheckTime</key>
-	<date>2020-02-10T17:50:24Z</date>
+	<date>2020-06-06T17:51:57Z</date>
 	<key>SUSendProfileInfo</key>
 	<false/>
+	<key>SUUpdateGroupIdentifier</key>
+	<integer>1765495385</integer>
 	<key>SUUpdateRelaunchingMarker</key>
+	<false/>
+	<key>SoundForEsc</key>
+	<false/>
+	<key>VisualIndicatorForEsc</key>
 	<false/>
 	<key>findMode_iTerm</key>
 	<integer>0</integer>
 	<key>iTerm Version</key>
-	<string>3.3.8</string>
+	<string>3.3.9</string>
 </dict>
 </plist>
