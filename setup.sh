@@ -8,15 +8,15 @@ xcode-select --install
 git -C "$(brew --repo homebrew/core)" fetch --unshallow
 fi
 
-# regular brew installs
-brew install python byobu ctags wget
+# update brew and install base bundle
+brew update
+brew bundle install
 
 # one liners with options
 brew install lastpass-cli --with-pinentry --with-doc
 brew install gdb --with-all-targets --with-python
 
 # cask installs
-brew cask install iterm2 macdown
 
 # iTerm2 Configuration - NEEDS TESTING MAY NOT WORK
 ITERM2_PREF_DIR=$SCRIPT_DIR
@@ -98,6 +98,34 @@ export HISTFILE=~/.bash_eternal_history
 # Force prompt to write history after every command.
 # http://superuser.com/questions/20900/bash-history-loss
 PROMPT_COMMAND="history -a; $PROMPT_COMMAND"
+codeblock
+
+# install rust
+curl https://sh.rustup.rs -sSf | sh -s -- -y
+rustup component add clippy rustfmt
+
+# pyenv setup
+cat >> $BASHRC <<'codeblock'
+export PATH="$HOME/.pyenv/bin:$PATH"
+eval "$(pyenv init -)"
+eval "$(pyenv virtualenv-init -)"
+codeblock
+
+# poetry setup
+curl -sSL https://install.python-poetry.org | python3 -
+echo 'export PATH="$HOME/.poetry/bin:$PATH"' >> $BASHRC
+
+# yq for some reason
+echo 'export PATH="/usr/local/opt/yq@3/bin:$PATH"' >> $BASHRC
+
+# using minikube for docker daemon
+cat >> $BASHRC <<'codeblock'
+# start minikube if it isn't already running
+if ! minikube status >/dev/null 2>&1; then
+minikube start
+fi
+# configure docker to use minikube
+eval $(minikube docker-env)
 codeblock
 
 
