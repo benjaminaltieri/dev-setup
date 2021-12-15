@@ -106,6 +106,9 @@ export PATH="$HOME/.pyenv/bin:$PATH"
 eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
 codeblock
+source $BASH_PROFILE
+pyenv install 3.9.9
+pyenv global 3.9.9
 
 # poetry setup
 curl -sSL https://install.python-poetry.org | python3 -
