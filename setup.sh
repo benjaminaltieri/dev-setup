@@ -4,7 +4,7 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 # brew setup
 if ! command -v brew >/dev/null 2>&1; then
 xcode-select --install
-/usr/bin/ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install)"
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 git -C "$(brew --repo homebrew/core)" fetch --unshallow
 fi
 
@@ -12,11 +12,8 @@ fi
 brew update
 brew bundle install
 
-# one liners with options
-brew install lastpass-cli --with-pinentry --with-doc
-brew install gdb --with-all-targets --with-python
-
-# cask installs
+# don't forget to configure gdb
+# https://sourceware.org/gdb/wiki/PermissionsDarwin
 
 # iTerm2 Configuration - NEEDS TESTING MAY NOT WORK
 ITERM2_PREF_DIR=$SCRIPT_DIR
@@ -102,7 +99,6 @@ codeblock
 
 # install rust
 curl https://sh.rustup.rs -sSf | sh -s -- -y
-rustup component add clippy rustfmt
 
 # pyenv setup
 cat >> $BASHRC <<'codeblock'
@@ -115,9 +111,6 @@ codeblock
 curl -sSL https://install.python-poetry.org | python3 -
 echo 'export PATH="$HOME/.poetry/bin:$PATH"' >> $BASHRC
 
-# yq for some reason
-echo 'export PATH="/usr/local/opt/yq@3/bin:$PATH"' >> $BASHRC
-
 # using minikube for docker daemon
 cat >> $BASHRC <<'codeblock'
 # start minikube if it isn't already running
@@ -127,7 +120,6 @@ fi
 # configure docker to use minikube
 eval $(minikube docker-env)
 codeblock
-
 
 # GDB config stuff for macOS
 echo "set startup-with-shell off" >> ~/.gdbinit
