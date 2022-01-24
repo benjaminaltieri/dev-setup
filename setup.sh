@@ -102,7 +102,7 @@ curl https://sh.rustup.rs -sSf | sh -s -- -y
 
 # pyenv setup
 cat >> $BASHRC <<'codeblock'
-export PATH="$HOME/.pyenv/bin:$PATH"
+export PATH="$HOME/.pyenv/shims:$HOME/.pyenv/bin:$PATH"
 eval "$(pyenv init -)"
 eval "$(pyenv virtualenv-init -)"
 codeblock
@@ -116,8 +116,8 @@ echo 'export PATH="$HOME/.poetry/bin:$PATH"' >> $BASHRC
 
 # using minikube for docker daemon
 cat >> $BASHRC <<'codeblock'
-# start minikube if it isn't already running
-if ! minikube status >/dev/null 2>&1; then
+# start minikube if it isn't already running (login shell only)
+if shopt -q login_shell && ! minikube status >/dev/null 2>&1; then
 minikube start
 fi
 # configure docker to use minikube
