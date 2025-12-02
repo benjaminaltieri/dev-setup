@@ -124,6 +124,10 @@ fi
 eval $(minikube docker-env)
 codeblock
 
+# go stuff
+echo 'export GOPATH=$HOME/go' >> $BASHRC
+echo 'export PATH="$HOME/.go/bin:$PATH"' >> $BASHRC
+
 # GDB config stuff for macOS
 echo "set startup-with-shell off" >> ~/.gdbinit
 
