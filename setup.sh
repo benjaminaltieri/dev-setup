@@ -1,145 +1,150 @@
 #!/usr/bin/env bash
+# Dev setup script for MacBook Pro M4 (Apple Silicon)
+# Updated for zsh (macOS default) and UV (replaces pyenv)
+
+set -e  # Exit on error
+
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-# brew setup
-if ! command -v brew >/dev/null 2>&1; then
-xcode-select --install
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-git -C "$(brew --repo homebrew/core)" fetch --unshallow
+echo "=== M4 MacBook Pro Development Setup ==="
+echo "This script will set up your development environment."
+echo ""
+
+# Detect architecture
+ARCH=$(uname -m)
+if [[ "$ARCH" == "arm64" ]]; then
+    BREW_PREFIX="/opt/homebrew"
+    echo "Detected Apple Silicon (M4) - using $BREW_PREFIX"
+else
+    BREW_PREFIX="/usr/local"
+    echo "Detected Intel - using $BREW_PREFIX"
 fi
 
-# update brew and install base bundle
+# Homebrew setup
+if ! command -v brew >/dev/null 2>&1; then
+    echo "Installing Homebrew..."
+    xcode-select --install 2>/dev/null || true
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    eval "$($BREW_PREFIX/bin/brew shellenv)"
+fi
+
+# Update brew and install base bundle
+echo "Installing Homebrew packages..."
 brew update
-brew bundle install
+brew bundle install --file="$SCRIPT_DIR/Brewfile"
 
-# don't forget to configure gdb
-# https://sourceware.org/gdb/wiki/PermissionsDarwin
-
-# iTerm2 Configuration - NEEDS TESTING MAY NOT WORK
+# iTerm2 Configuration
+echo "Configuring iTerm2..."
 ITERM2_PREF_DIR=$SCRIPT_DIR
-# Specify the preferences directory
 defaults write com.googlecode.iterm2.plist PrefsCustomFolder -string "$ITERM2_PREF_DIR"
-# Tell iTerm2 to use the custom preferences in the directory
 defaults write com.googlecode.iterm2.plist LoadPrefsFromCustomFolder -bool true
 
-# start home folder modifications
-pushd ~
-cp $SCRIPT_DIR/.gitconfig .
-cp $SCRIPT_DIR/.gitignore_global .
+# Start home folder modifications
+pushd ~ > /dev/null
 
-# let's create our bash dot files and route correctly
-BASH_PROFILE=~/.bash_profile
-BASHRC=~/.bashrc
-if ! [ -f $BASH_PROFILE ]; then
-    touch $BASH_PROFILE
-    chmod 700 $BASH_PROFILE
+# Copy git configuration
+echo "Setting up git configuration..."
+cp "$SCRIPT_DIR/.gitconfig" .
+cp "$SCRIPT_DIR/.gitignore_global" .
+
+# Fix credential helper path for Apple Silicon
+if [[ "$ARCH" == "arm64" ]]; then
+    echo "Updating .gitconfig credential helper paths for Apple Silicon..."
+    sed -i '' 's|/usr/local/bin/gh|/opt/homebrew/bin/gh|g' ~/.gitconfig
 fi
-echo "[ -r $BASHRC ] && . $BASHRC" >> $BASH_PROFILE
-if ! [ -f $BASHRC ]; then
-    touch $BASHRC
-    chmod 700 $BASHRC
+
+# Setup zsh (macOS default shell since Catalina)
+echo "Setting up zsh configuration..."
+ZSHRC=~/.zshrc
+
+# Backup existing .zshrc if present
+if [[ -f "$ZSHRC" ]]; then
+    cp "$ZSHRC" "$ZSHRC.backup.$(date +%Y%m%d_%H%M%S)"
+    echo "Backed up existing .zshrc"
 fi
-# special for python, add the homebrew version into path
-echo 'export PATH="/usr/local/opt/python/libexec/bin:$PATH"' >> $BASHRC
-# test it
-source $BASHRC
-BREW_PYTHON="$(command -v python)"
-echo $BREW_PYTHON
-python --version
 
-# git bash completion
-curl https://raw.githubusercontent.com/git/git/master/contrib/completion/git-completion.bash -o /usr/local/etc/git_completion
-echo '[ -f /usr/local/etc/git_completion ] && . /usr/local/etc/git_completion' >> $BASHRC
+# Copy our zsh configuration
+cp "$SCRIPT_DIR/.zshrc" "$ZSHRC"
+chmod 700 "$ZSHRC"
 
-# installs via pip
-pip install virtualenv virtualenvwrapper
-VIRTUALENV_BIN="$(command -v virtualenv)"
-echo $VIRTUALENV_BIN
-
-# virtualenvwrapper requires some more setup
-# courtesy of http://mkelsey.com/2013/04/30/how-i-setup-virtualenv-and-virtualenvwrapper-on-my-mac/
-cat >> $BASHRC <<'codeblock'
-# set where virtual environments will live
-export WORKON_HOME=$HOME/.virtualenvs
-# we have a special install, so set these as well
-export VIRTUALENVWRAPPER_PYTHON="$(command -v python)"
-export VIRTUALENVWRAPPER_VIRTUALENV="$(command -v virtualenv)"
-# ensure all new environments are isolated from the site-packages directory
-export VIRTUALENVWRAPPER_VIRTUALENV_ARGS='--no-site-packages'
-# use the same directory for virtualenvs as virtualenvwrapper
-export PIP_VIRTUALENV_BASE=$WORKON_HOME
-# makes pip detect an active virtualenv and install to it
-export PIP_RESPECT_VIRTUALENV=true
-if [[ -r /usr/local/bin/virtualenvwrapper.sh ]]; then
-	source /usr/local/bin/virtualenvwrapper.sh
-else
-	echo "WARNING: Can't find virtualenvwrapper.sh"
+# Install Rust
+if ! command -v rustc >/dev/null 2>&1; then
+    echo "Installing Rust..."
+    curl https://sh.rustup.rs -sSf | sh -s -- -y
 fi
-codeblock
-# source changes and test
-source $BASH_PROFILE
-virtualenvwrapper
 
-# save all bash history
-cat >> $BASHRC <<'codeblock'
-# Eternal bash history.
-# ---------------------
-# Undocumented feature which sets the size to "unlimited".
-# http://stackoverflow.com/questions/9457233/unlimited-bash-history
-export HISTFILESIZE=9999999999
-export HISTSIZE=9999999999
-export HISTTIMEFORMAT="[%F %T] "
-# Change the file location because certain bash sessions truncate .bash_history file upon close.
-# http://superuser.com/questions/575479/bash-history-truncated-to-500-lines-on-each-login
-export HISTFILE=~/.bash_eternal_history
-# Force prompt to write history after every command.
-# http://superuser.com/questions/20900/bash-history-loss
-PROMPT_COMMAND="history -a; $PROMPT_COMMAND"
-codeblock
-
-# install rust
-curl https://sh.rustup.rs -sSf | sh -s -- -y
-
-# pyenv setup
-cat >> $BASHRC <<'codeblock'
-export PATH="$HOME/.pyenv/shims:$HOME/.pyenv/bin:$PATH"
-eval "$(pyenv init -)"
-eval "$(pyenv virtualenv-init -)"
-codeblock
-source $BASH_PROFILE
-pyenv install 3.9.9
-pyenv global 3.9.9
-
-# poetry setup
-curl -sSL https://install.python-poetry.org | python3 -
-echo 'export PATH="$HOME/.poetry/bin:$PATH"' >> $BASHRC
-
-# using minikube for docker daemon
-cat >> $BASHRC <<'codeblock'
-# start minikube if it isn't already running (login shell only)
-if shopt -q login_shell && ! minikube status >/dev/null 2>&1; then
-minikube start
+# Install UV (Python version management - replaces pyenv)
+if ! command -v uv >/dev/null 2>&1; then
+    echo "Installing UV..."
+    curl -LsSf https://astral.sh/uv/install.sh | sh
 fi
-# configure docker to use minikube
-eval $(minikube docker-env)
-codeblock
 
-# go stuff
-echo 'export GOPATH=$HOME/go' >> $BASHRC
-echo 'export PATH="$HOME/.go/bin:$PATH"' >> $BASHRC
+# Install NVM (Node Version Manager)
+if [[ ! -d "$HOME/.nvm" ]]; then
+    echo "Installing NVM..."
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+fi
 
-# GDB config stuff for macOS
-echo "set startup-with-shell off" >> ~/.gdbinit
+# Install Claude Code
+if ! command -v claude >/dev/null 2>&1 && [[ ! -f "$HOME/.claude/local/claude" ]]; then
+    echo "Installing Claude Code..."
+    npm install -g @anthropic-ai/claude-code
+    # Localize Claude Code to ~/.claude/local for faster startup
+    echo "Localizing Claude Code..."
+    claude --dangerously-skip-permissions /localize
+fi
 
-# setup dotvim
+# Go directory setup
+echo "Setting up Go environment..."
+mkdir -p ~/go
+
+# Setup dotvim
+echo "Setting up vim configuration..."
 DOTVIM=~/.vim
-if [ -d $DOTVIM ]; then
-    rm -rf $DOTVIM
+if [[ -d $DOTVIM ]]; then
+    echo "Updating existing vim configuration..."
+    pushd $DOTVIM > /dev/null
+    git pull origin master || true
+    ./setup.sh
+    popd > /dev/null
+else
+    git clone https://github.com/benjaminaltieri/dotvim $DOTVIM
+    pushd $DOTVIM > /dev/null
+    ./setup.sh
+    popd > /dev/null
 fi
-git clone https://github.com/benjaminaltieri/dotvim $DOTVIM
-pushd $DOTVIM
-./setup.sh
-popd
 
-# end home folder modifications
-popd
+# Setup Claude Code configuration
+echo "Setting up Claude Code configuration..."
+CLAUDE_DIR=~/.claude
+mkdir -p "$CLAUDE_DIR"
+
+if [[ -f "$SCRIPT_DIR/claude/CLAUDE.md" ]]; then
+    cp "$SCRIPT_DIR/claude/CLAUDE.md" "$CLAUDE_DIR/"
+    echo "Copied CLAUDE.md"
+fi
+
+if [[ -f "$SCRIPT_DIR/claude/settings.json" ]]; then
+    # Merge settings if file exists, otherwise just copy
+    if [[ -f "$CLAUDE_DIR/settings.json" ]]; then
+        echo "Claude settings.json already exists - not overwriting"
+        echo "Review $SCRIPT_DIR/claude/settings.json for any new settings to add"
+    else
+        cp "$SCRIPT_DIR/claude/settings.json" "$CLAUDE_DIR/"
+        echo "Copied settings.json"
+    fi
+fi
+
+# End home folder modifications
+popd > /dev/null
+
+echo ""
+echo "=== Setup Complete ==="
+echo ""
+echo "Post-setup steps:"
+echo "1. Restart your terminal or run: source ~/.zshrc"
+echo "2. Configure gcloud: gcloud auth login && gcloud auth application-default login"
+echo "3. Configure gh: gh auth login"
+echo "4. Install Python version with UV: uv python install 3.12"
+echo "5. Install Node version with NVM: nvm install --lts"
+echo ""
