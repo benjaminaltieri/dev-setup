@@ -1,3 +1,6 @@
+# Git configuration for Benjamin Altieri
+# NOTE: On Apple Silicon (M4), update credential helper paths from
+#       /usr/local/bin/gh to /opt/homebrew/bin/gh
 [user]
     name = Benjamin Altieri
     email = benaltieri@gmail.com
@@ -20,14 +23,15 @@
     co = "checkout"
     cob = "!f(){ git checkout -b benaltieri/$1; }; f"
     cobt = "!f(){ git checkout -b benaltieri/$(git bnamel)/$1; }; f"
-    com = "!f(){ git checkout main || git checkout master; }; f"
-    comp = "!f(){ git checkout main || git checkout master; git pull; }; f"
+    com = "!f(){ git checkout $(git defaultbranch); }; f"
+    comp = "!f(){ git checkout $(git defaultbranch); git pull; }; f"
     cop = "!f(){ git checkout $1; git pull; }; f"
     copp = "!f(){ git checkout pre-production; git pull; }; f"
     conflicts = "!$EDITOR $(git diff --name-only --diff-filter=U)"
     cor = "!f(){ git checkout ${1}-release; }; f"
     corp = "!f(){ git checkout ${1}-release; git pull; }; f"
     d = "diff"
+    defaultbranch = "!f(){ gh repo view --json defaultBranchRef --jq '.defaultBranchRef.name'; }; f"
     ds = "diff --staged"
     empty = "commit --allow-empty"
     f = "push --force-with-lease"
@@ -41,16 +45,24 @@
     pn = "push -u"
     pro = "!f(){ git pull --rebase origin $(git bname); }; f"
     prob = "!f(){ git pull --rebase origin ${1}; }; f"
-    prom = "!f(){ git pull --rebase origin main || git pull --rebase origin master; }; f"
+    prom = "!f(){ git pull --rebase origin $(git defaultbranch); }; f"
+    prum = "!f(){ git pull --rebase upstream $(git defaultbranch); }; f"
     pror = "!f(){ git pull --rebase origin ${1}-release; }; f"
     pu = "push -u"
     re = "!f(){ git rebase -i HEAD~${1}; }; f"
     recon = "rebase --continue"
     rebort = "rebase --abort"
+    rsr = "restore"
+    rsrs = "restore --staged"
     s = "status"
+    squash = "!f(){ git reset --soft $(git merge-base $(git defaultbranch) HEAD); if [[ -z ${1} ]]; then git commit; else git commit -m \"${1}\"; fi }; f"
     st = "status -sb"
     sur = "submodule update --init --recursive"
     suno = "status -uno"
+    update = "!f(){ git fetch origin; git reset --hard origin/$(git bname); }; f"
+    wta = "worktree add .trees/${1} benaltieri/${1}"
+    wtr = "worktree remove .trees/${1}"
+    wtrf = "worktree remove -f .trees/${1}"
 [push]
     default = current
 [color]
@@ -59,3 +71,11 @@
     autocorrect = 1
 [fetch]
     prune = true
+[pull]
+    ff = only
+[credential "https://github.com"]
+    helper =
+    helper = !/usr/local/bin/gh auth git-credential
+[credential "https://gist.github.com"]
+    helper =
+    helper = !/usr/local/bin/gh auth git-credential
