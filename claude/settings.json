@@ -1,0 +1,48 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git au:*)",
+      "Bash(git c:*)",
+      "Bash(git co:*)",
+      "Bash(git cob:*)",
+      "Bash(git comp:*)",
+      "Bash(git log:*)",
+      "Bash(git status:*)",
+      "Bash(gh auth status:*)",
+      "Bash(gh co:*)",
+      "Bash(gh pr checkout:*)",
+      "Bash(gh pr checks:*)",
+      "Bash(gh pr diff:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh pr status:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh repo list:*)",
+      "Bash(gh run download:*)",
+      "Bash(gh run list:*)",
+      "Bash(gh run view:*)",
+      "Bash(gh run watch:*)",
+      "Bash(gh search:*)",
+      "Bash(poetry run pytest:*)",
+      "Bash(poetry --version:*)",
+      "Bash(pytest:*)",
+      "Bash(uv run pytest:*)"
+    ]
+  },
+  "hooks": {
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "terminal-notifier -message \"Claude is waiting for input\"; afplay /System/Library/Sounds/Blow.aiff &"
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {
+    "example-skills@anthropic-agent-skills": true
+  },
+  "alwaysThinkingEnabled": false
+}
