@@ -45,3 +45,20 @@ tree_aligned() {
     }'
 }
 alias treel='tree_aligned'
+
+
+# Claude Code aliases
+alias claude="$HOME/.local/bin/claude"
+alias clod="claude --dangerously-skip-permissions"
+alias clodcon="claude --dangerously-skip-permissions --continue"
+alias clodres="claude --dangerously-skip-permissions --resume"
+alias clodfork="claude --dangerously-skip-permissions --fork-session --resume"
+alias clad="claude --enable-auto-mode"
+alias cladcon="claude --enable-auto-mode --continue"
+alias cladres="claude --enable-auto-mode --resume"
+# cld*: no explicit permission flag, so permissions.defaultMode in
+# ~/.claude/settings.json decides (currently "auto").
+alias cld="claude"
+alias cldcon="claude --continue"
+alias cldres="claude --resume"
+alias cldfork="claude --fork-session --resume"

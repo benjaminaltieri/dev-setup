@@ -70,7 +70,7 @@ chmod 700 "$ZSHRC"
 # Install Rust
 if ! command -v rustc >/dev/null 2>&1; then
     echo "Installing Rust..."
-    curl https://sh.rustup.rs -sSf | sh -s -- -y
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 fi
 
 # Install UV (Python version management - replaces pyenv)
@@ -91,7 +91,7 @@ if ! command -v claude >/dev/null 2>&1 && [[ ! -f "$HOME/.claude/local/claude" ]
     npm install -g @anthropic-ai/claude-code
     # Localize Claude Code to ~/.claude/local for faster startup
     echo "Localizing Claude Code..."
-    claude --dangerously-skip-permissions /localize
+    claude migrate-installer
 fi
 
 # Go directory setup
