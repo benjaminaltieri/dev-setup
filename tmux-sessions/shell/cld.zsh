@@ -1,7 +1,7 @@
 # cld family - start or resume Claude Code sessions by name, or from a prompt file.
 #
 # Source from ~/.zshrc:
-#   source ~/obsidian/quantumscape/tmux-setup/shell/cld.zsh
+#   source ~/misc/dev-setup/tmux-sessions/shell/cld.zsh
 #
 # Companions defined as plain aliases in ~/misc/dev-setup/shell_aliases.sh:
 #   cld     claude                              cldcon  claude --continue
