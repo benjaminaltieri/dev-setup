@@ -1,0 +1,170 @@
+#!/usr/bin/env zsh
+# cld-spawn - start a Claude Code session in a NEW tmux window or split, detached.
+#
+# Written for agents: a planning or management session that has produced a prompt
+# file can hand the work off to a real interactive session the user can switch to,
+# instead of running it as a nested subagent or leaving it stranded in a UI.
+#
+#   cld-spawn [options] <prompt-file>
+#
+#     -d, --dir <dir>      working directory (default: the prompt file's directory)
+#     -m, --model <name>   sonnet | opus | fable | haiku | full model id
+#                          (default: opus)
+#     -e, --effort <lvl>   low | medium | high | xhigh | max  (default: high)
+#     -t, --title <name>   session title (default: derived from the file name)
+#     -s, --split          split the current window (default)
+#     -H, --horizontal     make that split side by side (tmux's -h)
+#     -V, --vertical       make that split stacked      (tmux's -v, the default)
+#     -w, --window         make a new window instead
+#     -T, --target <pane>  split THAT pane instead of the calling one, so a second
+#                          spawn can stack under the first (pass the pane id the
+#                          previous run printed)
+#     -S, --switch         jump to it now (default: leave the user where they are)
+#         --pane-id        print only the new pane's id, for chaining with -T
+#         --dry-run        print what would happen, change nothing
+#
+# Model and effort default to opus/high rather than being left unset. What a new
+# session inherits when neither is given follows whatever was last selected inside
+# a session, so it drifts and cannot be relied on; pinning them here means a
+# caller that says nothing still gets a known configuration. Pass -m '' or -e ''
+# to deliberately omit the flag and take whatever Claude Code would have chosen.
+#
+# The new pane runs `cldp`, so it resumes an existing session of that title or
+# starts one, and kicks it off by @-tagging the prompt file. Panes inherit the
+# tmux server's environment rather than the caller's, so the spawned session is a
+# normal top-level session even when launched from inside another agent.
+
+emulate -L zsh
+setopt no_nomatch
+
+SELF="${0:t}"
+die() { print -ru2 -- "$SELF: $*"; exit 1; }
+
+HERE="${0:A:h:h}"
+[[ -r "$HERE/shell/cld.zsh" ]] && source "$HERE/shell/cld.zsh"
+
+dir="" model="opus" effort="high" title="" split=1 switch=0 dry=0
+# tmux's own naming: -h puts the new pane beside the old one, -v below it.
+orient="" orient_desc="stacked" anchor_override="" pane_id_only=0
+
+while (( $# )); do
+  case "$1" in
+    -d|--dir)    dir="${2:?--dir needs a path}"; shift 2 ;;
+    -m|--model)  model="${2?--model needs a value ('' to omit)}"; shift 2 ;;
+    -e|--effort) effort="${2?--effort needs a value ('' to omit)}"; shift 2 ;;
+    -t|--title)  title="${2:?--title needs a name}"; shift 2 ;;
+    -s|--split)  split=1; shift ;;
+    -H|--horizontal) orient="-h"; orient_desc="side by side"; split=1; shift ;;
+    -V|--vertical)   orient="-v"; orient_desc="stacked";      split=1; shift ;;
+    -w|--window) split=0; shift ;;
+    -T|--target) anchor_override="${2?--target needs a pane id}"
+                 # An empty value must not fall through to the caller's pane: a
+                 # chain whose previous step failed passes -T "" and would
+                 # otherwise silently reparent the rest onto the caller.
+                 [[ -n "$anchor_override" ]] || die "--target was given an empty pane id"
+                 shift 2 ;;
+    -S|--switch) switch=1; shift ;;
+    --pane-id)   pane_id_only=1; shift ;;
+    --dry-run)   dry=1; shift ;;
+    -h|--help)   sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --)          shift; break ;;
+    -*)          die "unknown option: $1" ;;
+    *)           break ;;
+  esac
+done
+
+pfile="$1"
+[[ -n "$pfile" ]] || die "usage: $SELF [options] <prompt-file>"
+[[ -f "$pfile" ]] || die "not a file: $pfile"
+
+case "$effort" in
+  ''|low|medium|high|xhigh|max) ;;
+  *) die "effort must be one of: low medium high xhigh max (got '$effort')" ;;
+esac
+
+abs_file="${pfile:A}"
+[[ -n "$dir" ]] || dir="${abs_file:h}"
+[[ -d "$dir" ]] || die "not a directory: $dir"
+abs_dir="${dir:A}"
+
+# Reference the prompt file relative to the session's working directory when it
+# lives underneath it, so the @mention reads the way a human would write it.
+if [[ "$abs_file" == "$abs_dir"/* ]]; then
+  ref="${abs_file#$abs_dir/}"
+else
+  ref="$abs_file"
+fi
+
+[[ -n "$title" ]] || title="$(_cld_title_from_path "$abs_file")"
+[[ -n "$title" ]] || die "could not derive a title from: $pfile"
+
+# Build the command the new pane will run. cldp resolves resume-vs-create and
+# does the @-tagging; everything after the path is passed through to claude.
+cmd="cldp ${(q)ref}"
+[[ -n "$model"  ]] && cmd+=" --model ${(q)model}"
+[[ -n "$effort" ]] && cmd+=" --effort ${(q)effort}"
+
+if [[ -z "${TMUX:-}" ]]; then
+  print -ru2 -- "$SELF: not inside tmux; run this from a tmux pane, or start the session yourself with:"
+  print -r  -- "  cd ${(q)abs_dir} && $cmd"
+  exit 1
+fi
+
+# Every tmux command here is anchored to $TMUX_PANE. Untargeted tmux commands act
+# on the *globally active* pane, not the calling one, so an agent that omitted the
+# target would split whichever window the user happened to be looking at.
+anchor="${anchor_override:-${TMUX_PANE:?cannot determine the calling pane}}"
+# display-message does NOT fail on a bad target, it silently falls back and
+# returns an empty string, so the pane has to be checked against the real list.
+anchor_resolved="$(tmux display-message -p -t "$anchor" '#{pane_id}' 2>/dev/null)"
+if [[ -z "$anchor_resolved" ]] || ! tmux list-panes -a -F '#{pane_id}' | grep -qx -- "$anchor_resolved"; then
+  die "no such pane: $anchor"
+fi
+anchor="$anchor_resolved"
+sess="$(tmux display-message -p -t "$anchor" '#{session_name}')"
+
+if (( dry )); then
+  print -r -- "would create: $( (( split )) && print -n "a $orient_desc split of the current window" || print -n 'new window' ) named '$title'"
+  print -r -- "  cwd:    $abs_dir"
+  print -r -- "  run:    $cmd"
+  print -r -- "  model:  ${model:-<inherited>}"
+  print -r -- "  effort: ${effort:-<inherited>}"
+  print -r -- "  anchor: $anchor ($(tmux display-message -p -t "$anchor" '#{window_index}/#{window_name}'))"
+  exit 0
+fi
+
+if (( split )); then
+  typeset -a sflag; [[ -n "$orient" ]] && sflag=("$orient")
+  pane="$(tmux split-window -d -P -F '#{pane_id}' "${sflag[@]}" -t "$anchor" -c "$abs_dir")" \
+    || die "could not split the window"
+  target="$pane"
+  where="a $orient_desc split of window $(tmux display-message -p -t "$pane" '#{window_index}') ($(tmux display-message -p -t "$pane" '#{window_name}'))"
+else
+  # new-window takes a window target, not a pane target: anchor to the calling
+  # pane's *window* so the new one is inserted right after it.
+  anchor_win="$(tmux display-message -p -t "$anchor" '#{window_id}')"
+  pane="$(tmux new-window -d -P -F '#{pane_id}' -a -t "$anchor_win" -n "$title" -c "$abs_dir")" \
+    || die "could not create a window"
+  target="$pane"
+  where="window $(tmux display-message -p -t "$pane" '#{window_index}') ($title)"
+fi
+
+# Label the pane immediately: Claude Code writes no session file until the first
+# user prompt, so without this a snapshot taken in between would miss it.
+tmux set-option -p -t "$target" @cc_name "$title" 2>/dev/null
+
+tmux send-keys -t "$target" "$cmd" Enter
+
+(( switch )) && { tmux select-window -t "$target"; tmux select-pane -t "$target"; }
+
+if (( pane_id_only )); then
+  print -r -- "$target"
+  exit 0
+fi
+
+print -r  -- "started '$title' in $where"
+print -r  -- "  cwd:    $abs_dir"
+print -r  -- "  prompt: @$ref"
+[[ -n "$model"  ]] && print -r -- "  model:  $model"
+[[ -n "$effort" ]] && print -r -- "  effort: $effort"
+print -r  -- "  jump:   tmux select-window -t $target"

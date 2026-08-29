@@ -1,0 +1,279 @@
+#!/usr/bin/env bash
+# tmux-restore - rebuild the tmux layout from a snapshot and resume each agent.
+#
+# Resume is by Claude Code *session id*, never by name: in Claude Code 2.1.229
+# `--resume <name>` only pre-fills an interactive picker, which would hang here,
+# whereas `--resume <uuid>` is a direct, non-interactive, id-stable resume.
+#
+# Idempotent: existing sessions, windows and panes are reused, and no keys are
+# ever sent into a pane that already has a foreground process running.
+#
+# Usage:
+#   tmux-restore [-S <socket>] [-f <snapshot>] [--session <name>]
+#                [--dry-run] [--layout-only] [--force]
+#
+# Default snapshot: ~/.config/tmux-snap/latest.json
+
+set -euo pipefail
+
+SNAP_DIR="${TMUX_SNAP_DIR:-$HOME/.config/tmux-snap}"
+SNAP_FILE=""
+SOCKET=""
+ONLY_SESSION=""
+DRY=0
+LAYOUT_ONLY=0
+FORCE=0
+
+die() { printf 'tmux-restore: %s\n' "$*" >&2; exit 1; }
+note() { printf 'tmux-restore: %s\n' "$*" >&2; }
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -S) SOCKET="${2:?-S needs a socket path}"; shift 2 ;;
+    -f) SNAP_FILE="${2:?-f needs a file}"; shift 2 ;;
+    --session) ONLY_SESSION="${2:?--session needs a name}"; shift 2 ;;
+    --dry-run|-n) DRY=1; shift ;;
+    --layout-only) LAYOUT_ONLY=1; shift ;;
+    --force) FORCE=1; shift ;;
+    -h|--help) sed -n '1,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) die "unknown argument: $1" ;;
+  esac
+done
+
+command -v jq >/dev/null 2>&1 || die "jq is required"
+
+[ -n "$SNAP_FILE" ] || SNAP_FILE="$SNAP_DIR/latest.json"
+[ -r "$SNAP_FILE" ] || die "cannot read snapshot: $SNAP_FILE"
+jq -e '.version == 1' "$SNAP_FILE" >/dev/null 2>&1 || die "not a v1 snapshot: $SNAP_FILE"
+
+# --- socket resolution -------------------------------------------------------
+# Explicit -S wins, then the server we are running inside, then the socket the
+# snapshot was taken from. That last fallback is what lets a restore run from a
+# plain shell outside byobu still land in the byobu server.
+if [ -z "$SOCKET" ] && [ -n "${TMUX:-}" ]; then
+  SOCKET="${TMUX%%,*}"
+fi
+if [ -z "$SOCKET" ]; then
+  SOCKET="$(jq -r '.socket // empty' "$SNAP_FILE")"
+fi
+[ -n "$SOCKET" ] || die "could not determine a tmux socket"
+
+TM=(tmux -S "$SOCKET")
+
+if ! "${TM[@]}" list-sessions >/dev/null 2>&1; then
+  if [ "$DRY" -eq 1 ]; then
+    note "(dry-run) no server on $SOCKET; would start one"
+  else
+    note "no server on $SOCKET; starting one"
+    "${TM[@]}" start-server
+  fi
+fi
+
+run() {
+  if [ "$DRY" -eq 1 ]; then
+    printf '  tmux -S %s' "$SOCKET"
+    for a in "$@"; do printf ' %q' "$a"; done
+    printf '\n'
+  else
+    "${TM[@]}" "$@"
+  fi
+}
+
+# Queries always hit the real server, even under --dry-run, so the printed plan
+# reflects the machine's actual state.
+q() { "${TM[@]}" "$@" 2>/dev/null || true; }
+
+# Under --dry-run nothing is actually created, so remember what we pretended to
+# create; otherwise every window would re-announce "creating session".
+NL=$'\n'
+DRY_SESS=""
+DRY_WINS=""
+
+session_exists() {
+  if "${TM[@]}" has-session -t "=$1" >/dev/null 2>&1; then return 0; fi
+  if [ "$DRY" -eq 1 ] && printf '%s' "$DRY_SESS" | grep -Fxq -- "$1"; then return 0; fi
+  return 1
+}
+
+window_exists() {
+  if q list-windows -t "=$1" -F '#{window_index}' | grep -qx -- "$2"; then return 0; fi
+  if [ "$DRY" -eq 1 ] && printf '%s' "$DRY_WINS" | grep -Fxq -- "$1$US$2"; then return 0; fi
+  return 1
+}
+
+pane_count() {
+  q list-panes -t "=$1:$2" -F '#{pane_index}' | grep -c . || true
+}
+
+pane_cmd() {
+  q display-message -p -t "=$1:$2.$3" '#{pane_current_command}'
+}
+
+is_shell() {
+  case "$1" in
+    zsh|bash|sh|fish|dash|-zsh|-bash|tcsh|ksh) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+US="$(printf '\037')"
+
+N_RESUMED=0
+N_SKIPPED=0
+N_WIN=0
+
+SESSIONS="$(jq -r '.sessions[].name' "$SNAP_FILE")"
+
+# Here-strings (not pipes) so loop bodies run in this shell: state propagates
+# and `set -e` still aborts on a real tmux failure.
+while IFS= read -r sess; do
+  [ -n "$sess" ] || continue
+  if [ -n "$ONLY_SESSION" ] && [ "$sess" != "$ONLY_SESSION" ]; then
+    continue
+  fi
+
+  WINDOWS="$(jq -r --arg s "$sess" --arg us "$US" '
+    .sessions[] | select(.name == $s) | .windows[]
+    | [ (.index|tostring), .name, .layout, (.panes|length|tostring),
+        (.panes[0].cwd // ""), (if .active then "1" else "0" end) ]
+    | join($us)' "$SNAP_FILE")"
+
+  while IFS= read -r wrec; do
+    [ -n "$wrec" ] || continue
+    widx="$(printf  '%s' "$wrec" | cut -d"$US" -f1)"
+    wname="$(printf '%s' "$wrec" | cut -d"$US" -f2)"
+    layout="$(printf '%s' "$wrec"| cut -d"$US" -f3)"
+    npanes="$(printf '%s' "$wrec"| cut -d"$US" -f4)"
+    wcwd="$(printf  '%s' "$wrec" | cut -d"$US" -f5)"
+    wactive="$(printf '%s' "$wrec"| cut -d"$US" -f6)"
+
+    [ -d "$wcwd" ] || wcwd="$HOME"
+
+    win_is_new=0
+
+    if ! session_exists "$sess"; then
+      note "creating session '$sess'"
+      run new-session -d -s "$sess" -n "$wname" -c "$wcwd"
+      DRY_SESS="$DRY_SESS$sess$NL"
+      DRY_WINS="$DRY_WINS$sess$US$widx$NL"
+      win_is_new=1
+      if [ "$DRY" -eq 0 ]; then
+        made="$(q list-windows -t "=$sess" -F '#{window_index}' | head -1)"
+        if [ -n "$made" ] && [ "$made" != "$widx" ]; then
+          run move-window -s "=$sess:$made" -t "=$sess:$widx"
+        fi
+      fi
+    elif ! window_exists "$sess" "$widx"; then
+      note "creating window $sess:$widx ($wname)"
+      run new-window -d -t "=$sess:$widx" -n "$wname" -c "$wcwd"
+      DRY_WINS="$DRY_WINS$sess$US$widx$NL"
+      win_is_new=1
+    else
+      run rename-window -t "=$sess:$widx" "$wname"
+    fi
+    N_WIN=$((N_WIN + 1))
+
+    # --- panes ---------------------------------------------------------------
+    if [ "$win_is_new" -eq 1 ] && [ "$DRY" -eq 1 ]; then
+      have=1
+    else
+      have="$(pane_count "$sess" "$widx")"
+      [ -n "$have" ] || have=0
+    fi
+
+    while [ "$have" -lt "$npanes" ]; do
+      # tiled first so there is always room for another split
+      run select-layout -t "=$sess:$widx" tiled
+      run split-window -d -t "=$sess:$widx" -c "$wcwd"
+      have=$((have + 1))
+    done
+
+    if [ "$have" -gt "$npanes" ]; then
+      note "warning: $sess:$widx has $have panes, snapshot has $npanes; leaving extras alone"
+    fi
+
+    # Apply geometry before addressing panes by index:
+    # select-layout maps panes onto layout slots in index order, so this is what
+    # fixes the index -> position correspondence.
+    run select-layout -t "=$sess:$widx" "$layout"
+
+    if [ "$LAYOUT_ONLY" -eq 1 ]; then
+      continue
+    fi
+
+    PANES="$(jq -r --arg s "$sess" --argjson w "$widx" --arg us "$US" '
+      .sessions[] | select(.name == $s) | .windows[] | select(.index == $w) | .panes[]
+      | [ (.index|tostring), .cwd,
+          (.claude.session_id // ""), (.claude.name // ""),
+          (if .active then "1" else "0" end) ]
+      | join($us)' "$SNAP_FILE")"
+
+    while IFS= read -r prec; do
+      [ -n "$prec" ] || continue
+      pidx="$(printf  '%s' "$prec" | cut -d"$US" -f1)"
+      pcwd="$(printf  '%s' "$prec" | cut -d"$US" -f2)"
+      psid="$(printf  '%s' "$prec" | cut -d"$US" -f3)"
+      pname="$(printf '%s' "$prec" | cut -d"$US" -f4)"
+      pactive="$(printf '%s' "$prec"| cut -d"$US" -f5)"
+
+      target="=$sess:$widx.$pidx"
+
+      # Safety + idempotency: only drive panes sitting at a shell prompt. The
+      # check runs in dry-run too, so a dry-run over a live server tells the
+      # truth about what it would skip.
+      cur="$(pane_cmd "$sess" "$widx" "$pidx")"
+      if [ -n "$cur" ]; then
+        if ! is_shell "$cur" && [ "$FORCE" -eq 0 ]; then
+          note "skip $sess:$widx.$pidx (busy: $cur)"
+          N_SKIPPED=$((N_SKIPPED + 1))
+          continue
+        fi
+      elif [ "$DRY" -eq 0 ]; then
+        note "warning: $sess:$widx.$pidx missing; skipping"
+        N_SKIPPED=$((N_SKIPPED + 1))
+        continue
+      fi
+
+      [ -d "$pcwd" ] || pcwd="$HOME"
+
+      if [ -n "$psid" ]; then
+        # Label the pane independently of Claude Code, which overwrites
+        # #{pane_title} with its own status string.
+        run set-option -p -t "$target" @cc_name "$pname"
+        run set-option -p -t "$target" @cc_sid "$psid"
+        cmd="cd $(printf '%q' "$pcwd") && claude --resume $psid"
+        if [ -n "$pname" ]; then
+          cmd="$cmd -n $(printf '%q' "$pname")"
+        fi
+        run send-keys -t "$target" "$cmd" Enter
+        note "resume $sess:$widx.$pidx -> ${pname:-$psid}"
+        N_RESUMED=$((N_RESUMED + 1))
+      else
+        run send-keys -t "$target" "cd $(printf '%q' "$pcwd")" Enter
+      fi
+
+      if [ "$pactive" = "1" ]; then
+        run select-pane -t "$target"
+      fi
+    done <<EOF
+$PANES
+EOF
+
+    if [ "$wactive" = "1" ]; then
+      run select-window -t "=$sess:$widx"
+    fi
+  done <<EOF
+$WINDOWS
+EOF
+done <<EOF
+$SESSIONS
+EOF
+
+if [ "$DRY" -eq 1 ]; then
+  note "dry-run: $N_WIN windows, $N_RESUMED agent resumes, $N_SKIPPED skipped; no changes made"
+else
+  note "restored $N_WIN windows, $N_RESUMED agent resumes, $N_SKIPPED skipped"
+  if [ -z "${TMUX:-}" ]; then
+    note "attach with: byobu attach   (or: tmux -S $SOCKET attach)"
+  fi
+fi

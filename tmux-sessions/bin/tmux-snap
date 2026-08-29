@@ -1,0 +1,266 @@
+#!/usr/bin/env bash
+# tmux-snap - snapshot tmux layout plus the Claude Code session bound to each pane.
+#
+# Layout comes from tmux. Agent identity comes from ~/.claude/sessions/<pid>.json,
+# which Claude Code writes for every session and which already contains sessionId,
+# display name, cwd, and the owning tmux pane ("<session>:@<win>.%<pane>").
+#
+# No process inspection, no transcript parsing, no pane-title scraping.
+# (Claude Code overwrites #{pane_title} with its own status string, so titles are
+# not a usable metadata channel.)
+#
+# Usage:
+#   tmux-snap [-S <socket-path>] [-o <dir>] [--stdout] [-q]
+#
+# Writes <dir>/snap-YYYYmmdd-HHMMSS.json and refreshes <dir>/latest.json.
+
+set -euo pipefail
+
+SNAP_DIR="${TMUX_SNAP_DIR:-$HOME/.config/tmux-snap}"
+CLAUDE_SESSIONS="${CLAUDE_SESSIONS_DIR:-$HOME/.claude/sessions}"
+SOCKET=""
+TO_STDOUT=0
+QUIET=0
+ANNOTATE=1
+
+die() { printf 'tmux-snap: %s\n' "$*" >&2; exit 1; }
+note() { [ "$QUIET" -eq 1 ] || printf 'tmux-snap: %s\n' "$*" >&2; }
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -S) SOCKET="${2:?-S needs a socket path}"; shift 2 ;;
+    -o) SNAP_DIR="${2:?-o needs a directory}"; shift 2 ;;
+    --stdout) TO_STDOUT=1; shift ;;
+    --no-annotate) ANNOTATE=0; shift ;;
+    -q|--quiet) QUIET=1; shift ;;
+    -h|--help) sed -n '1,20p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) die "unknown argument: $1" ;;
+  esac
+done
+
+command -v jq >/dev/null 2>&1 || die "jq is required"
+
+# tmux replaces control characters in -F output with "_" unless it considers
+# itself in UTF-8 mode, which it decides from the locale. Under launchd the
+# environment is empty, so the 0x1f field separator below came back as "_" and
+# every record silently failed to parse. Pin a UTF-8 ctype if nothing else set
+# one.
+if [ -z "${LC_ALL:-}" ] && [ -z "${LC_CTYPE:-}" ] && [ -z "${LANG:-}" ]; then
+  LC_CTYPE="UTF-8"
+  export LC_CTYPE
+fi
+
+# --- socket resolution -------------------------------------------------------
+# Explicit -S wins; otherwise inherit the server we are running inside ($TMUX's
+# first comma-separated field); otherwise fall back to tmux's default socket.
+if [ -z "$SOCKET" ] && [ -n "${TMUX:-}" ]; then
+  SOCKET="${TMUX%%,*}"
+fi
+
+if [ -n "$SOCKET" ]; then
+  set -- -S "$SOCKET"
+else
+  set --
+fi
+TMUX_ARGS=("$@")
+
+tm() { tmux "${TMUX_ARGS[@]+"${TMUX_ARGS[@]}"}" "$@"; }
+
+# No server is a normal state between reboots, not a failure: a periodic timer
+# should not log an error every five minutes over it.
+if ! tm list-sessions >/dev/null 2>&1; then
+  if [ "$QUIET" -eq 1 ]; then
+    exit 0
+  fi
+  die "no tmux server reachable${SOCKET:+ on socket $SOCKET}"
+fi
+
+# Record the socket the data actually came from, so restore can target it.
+REAL_SOCKET="$(tm display-message -p '#{socket_path}')"
+
+# --- field separator ---------------------------------------------------------
+# Unit Separator: cannot appear in paths, window names, or session names.
+US="$(printf '\037')"
+
+PANE_FMT="$(printf '#{session_name}\037#{window_index}\037#{window_id}\037#{window_name}\037#{window_layout}\037#{?window_active,1,0}\037#{pane_index}\037#{pane_id}\037#{pane_current_path}\037#{?pane_active,1,0}\037#{pane_current_command}\037#{@cc_name}\037#{@cc_sid}')"
+
+TMPD="$(mktemp -d "${TMPDIR:-/tmp}/tmux-snap.XXXXXX")"
+trap 'rm -rf "$TMPD"' EXIT
+
+# --- 1. panes ---------------------------------------------------------------
+tm list-panes -a -F "$PANE_FMT" \
+  | jq -R -c --arg us "$US" '
+      split($us)
+      | if length < 13 then
+          error("field separator was mangled: got \(length) of 13 fields")
+        else . end
+      | {
+          session:       .[0],
+          window_index:  (.[1] | tonumber),
+          window_id:     .[2],
+          window_name:   .[3],
+          window_layout: .[4],
+          window_active: (.[5] == "1"),
+          pane_index:    (.[6] | tonumber),
+          pane_id:       .[7],
+          cwd:           .[8],
+          pane_active:   (.[9] == "1"),
+          pane_cmd:      .[10],
+          cc_name:       (if (.[11] // "") == "" then null else .[11] end),
+          cc_sid:        (if (.[12] // "") == "" then null else .[12] end)
+        }' > "$TMPD/panes.jsonl"
+
+[ -s "$TMPD/panes.jsonl" ] || die "tmux reported no panes"
+
+# --- 2. live Claude Code sessions -------------------------------------------
+# A session file is trusted only if its pid is alive AND that pid is actually a
+# claude process. procStart is NOT used for validation: Claude Code 2.1.229
+# records it in UTC while labelling it local time, so it never matches ps.
+: > "$TMPD/live.txt"
+if [ -d "$CLAUDE_SESSIONS" ]; then
+  for f in "$CLAUDE_SESSIONS"/*.json; do
+    [ -e "$f" ] || continue
+    pid="$(jq -r '.pid // empty' "$f" 2>/dev/null || true)"
+    case "$pid" in ''|*[!0-9]*) continue ;; esac
+    kill -0 "$pid" 2>/dev/null || continue
+    ps -p "$pid" -o command= 2>/dev/null | grep -q 'claude' || continue
+    printf '%s\n' "$f" >> "$TMPD/live.txt"
+  done
+fi
+
+: > "$TMPD/claude.jsonl"
+if [ -s "$TMPD/live.txt" ]; then
+  # shellcheck disable=SC2046
+  # The "tmux" field is "<session>:@<window-id>.%<pane-id>", recorded when the
+  # session registered and never updated. Only the pane id is used as the join
+  # key: a pane keeps its id when it is moved to another window, but the recorded
+  # window id goes stale, and keying on it made a moved pane fall through to
+  # whatever stale pane option it happened to carry. Cross-server collisions are
+  # caught by the cwd check in the join instead.
+  jq -c --arg us "$US" '
+    select(.sessionId != null and (.tmux // "") != "")
+    | (.tmux | capture("^(?<s>.*):(?<w>@[0-9]+)\\.(?<p>%[0-9]+)$")) as $t
+    | {
+        key:        $t.p,
+        session_id: .sessionId,
+        name:       (.name // null),
+        cwd:        (.cwd // null),
+        kind:       (.kind // null),
+        version:    (.version // null)
+      }' $(cat "$TMPD/live.txt") > "$TMPD/claude.jsonl" 2>/dev/null || true
+fi
+
+# --- 3. join and group -------------------------------------------------------
+# Two sources of agent identity, in precedence order:
+#
+#   1. the live session file  (authoritative: current session id and name)
+#   2. the pane options @cc_sid/@cc_name, written by `clds` and by tmux-restore
+#
+# The fallback matters because Claude Code only writes its session file on the
+# *first user prompt*, not at startup. A pane that tmux-restore just resumed and
+# that nobody has typed into yet has no session file, so without the pane-option
+# fallback a snapshot taken in that window would silently drop the agent and the
+# next reboot would lose the conversation.
+#
+# The fallback is only trusted while the pane is still running something other
+# than a shell: if the agent has exited and left a prompt, it was closed on
+# purpose and should not be resurrected.
+#
+# Session-file matches are additionally sanity-checked on cwd, since pane ids are
+# only unique per server.
+jq -n \
+  --slurpfile panes "$TMPD/panes.jsonl" \
+  --slurpfile agents "$TMPD/claude.jsonl" \
+  --arg saved_at "$(date +%Y-%m-%dT%H:%M:%S%z)" \
+  --arg socket "$REAL_SOCKET" \
+  --arg host "$(hostname -s)" \
+  --arg us "$US" '
+  ($agents | map({key: .key, value: .}) | from_entries) as $amap
+  | {
+      version: 1,
+      saved_at: $saved_at,
+      host: $host,
+      socket: $socket,
+      sessions: (
+        $panes
+        | map(
+            . as $p
+            | ($p.pane_cmd | test("^-?(zsh|bash|sh|fish|dash|tcsh|ksh)$")) as $at_shell
+            | ($amap[$p.pane_id] // null) as $a
+            | (if $a != null and ($a.cwd == null or $a.cwd == $p.cwd) then
+                 { session_id: $a.session_id, name: $a.name,
+                   kind: $a.kind, version: $a.version, source: "session-file" }
+               elif ($p.cc_sid != null and ($at_shell | not)) then
+                 { session_id: $p.cc_sid, name: $p.cc_name,
+                   kind: null, version: null, source: "pane-option" }
+               else null end) as $claude
+            | $p + {claude: $claude}
+          )
+        | group_by(.session)
+        | map({
+            name: .[0].session,
+            windows: (
+              group_by(.window_index)
+              | map({
+                  index:  .[0].window_index,
+                  name:   .[0].window_name,
+                  layout: .[0].window_layout,
+                  active: .[0].window_active,
+                  panes: (
+                    sort_by(.pane_index)
+                    | map({
+                        index:  .pane_index,
+                        pane_id: .pane_id,
+                        cwd:    .cwd,
+                        active: .pane_active,
+                        cmd:    .pane_cmd,
+                        label:  .cc_name,
+                        claude: .claude
+                      })
+                  )
+                })
+              | sort_by(.index)
+            )
+          })
+        | sort_by(.name)
+      )
+    }' > "$TMPD/snap.json"
+
+if [ "$TO_STDOUT" -eq 1 ]; then
+  cat "$TMPD/snap.json"
+  exit 0
+fi
+
+mkdir -p "$SNAP_DIR"
+STAMP="$(date +%Y%m%d-%H%M%S)"
+OUT="$SNAP_DIR/snap-$STAMP.json"
+mv "$TMPD/snap.json" "$OUT"
+
+# `latest.json` is a real symlink so the file itself stays git-trackable history.
+ln -sfn "$(basename "$OUT")" "$SNAP_DIR/latest.json"
+
+# Stamp identity back onto panes discovered through the session file, so those
+# panes stay self-describing once Claude Code's file is gone (it is keyed by pid
+# and disappears on exit/reboot). This makes every agent pane survivable by the
+# pane-option fallback above, not just the ones launched via `clds` or restore.
+if [ "$ANNOTATE" -eq 1 ]; then
+  jq -r '.sessions[].windows[].panes[]
+         | select(.claude != null and .claude.source == "session-file")
+         | [.pane_id, .claude.session_id, (.claude.name // "")] | @tsv' "$OUT" \
+  | while IFS="$(printf '\t')" read -r pid sid nm; do
+      [ -n "$pid" ] || continue
+      tm set-option -p -t "$pid" @cc_sid "$sid" 2>/dev/null || true
+      [ -n "$nm" ] && tm set-option -p -t "$pid" @cc_name "$nm" 2>/dev/null || true
+    done
+fi
+
+W="$(jq '[.sessions[].windows[]] | length' "$OUT")"
+P="$(jq '[.sessions[].windows[].panes[]] | length' "$OUT")"
+A="$(jq '[.sessions[].windows[].panes[] | select(.claude != null)] | length' "$OUT")"
+note "saved $OUT ($W windows, $P panes, $A agent sessions)"
+
+# Prune old snapshots, keeping the most recent N.
+KEEP="${TMUX_SNAP_KEEP:-40}"
+ls -1t "$SNAP_DIR"/snap-*.json 2>/dev/null | tail -n "+$((KEEP + 1))" | while read -r old; do
+  rm -f "$old"
+done

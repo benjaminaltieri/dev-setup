@@ -50,3 +50,7 @@ setopt INC_APPEND_HISTORY        # Add commands immediately
 
 # Claude Code alias
 alias claude="$HOME/.claude/local/claude"
+
+# Named, resumable Claude Code sessions (clds, cldp), with tab completion.
+# Sourced last so compinit has already run.
+[[ -f "$HOME/misc/dev-setup/tmux-sessions/shell/cld.zsh" ]] && source "$HOME/misc/dev-setup/tmux-sessions/shell/cld.zsh"

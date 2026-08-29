@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.benaltieri.tmux-snap</string>
+
+  <!-- Snapshot every 5 minutes so an unplanned reboot still has a recent
+       layout. Restore stays manual (C-a C-r); auto-resuming a dozen agents
+       at login is not wanted. -->
+  <key>ProgramArguments</key>
+  <!-- No -S: byobu runs on tmux's default socket, and tmux-snap resolves and
+       records the real socket path itself. With -q it exits silently when no
+       server is running, which is the normal state between reboots. -->
+  <array>
+    <string>__TMUX_SNAP__</string>
+    <string>-q</string>
+  </array>
+
+  <key>StartInterval</key>
+  <integer>300</integer>
+
+  <key>RunAtLoad</key>
+  <false/>
+
+  <!-- A dead socket between reboots is normal, not an error worth retrying. -->
+  <key>AbandonProcessGroup</key>
+  <false/>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/tmux-snap.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/tmux-snap.log</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>HOME</key>
+    <string>__HOME__</string>
+  </dict>
+</dict>
+</plist>

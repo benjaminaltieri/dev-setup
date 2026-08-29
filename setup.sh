@@ -135,6 +135,12 @@ if [[ -f "$SCRIPT_DIR/claude/settings.json" ]]; then
     fi
 fi
 
+# tmux session persistence + Claude Code session launchers
+if [[ -x "$SCRIPT_DIR/tmux-sessions/install.sh" ]]; then
+    echo "Installing tmux session tooling..."
+    "$SCRIPT_DIR/tmux-sessions/install.sh"
+fi
+
 # End home folder modifications
 popd > /dev/null
 
