@@ -86,6 +86,20 @@ plus a leading ordinal of up to three digits followed by `-`, `_` or `.`. So
 `2026-planning.md` keeps its year. On resume it does **not** re-send the tag, so
 reopening never costs a turn. `-n` forces a new session instead of resuming.
 
+**`-P <prefix>` names the workstream.** Prompt file names are often a bare ticket
+id plus a terse description, which is hard to pick out of a session list or
+search for later:
+
+```bash
+cldp -P my-project 01-CD-1234-a-ticket-task.md   # -> my-project-CD-1234-a-ticket-task
+```
+
+A trailing separator on the prefix is trimmed, so `-P my-project-` is the same.
+`-t <title>` sets the title outright, and a prefix still applies on top of it.
+Because the title is what the resume-vs-create probe looks for, adding a prefix
+to a workstream that already has sessions starts new ones rather than resuming
+the unprefixed sessions.
+
 **Effort level** is not one of the aliases; pass it through as a flag. Anything
 after the file path goes to `claude` verbatim:
 
@@ -111,6 +125,9 @@ cld-spawn [options] <prompt-file>
   -m, --model <name>   sonnet | opus | fable | haiku | id   (default: opus)
   -e, --effort <lvl>   low | medium | high | xhigh | max     (default: high)
   -t, --title <name>   session title       (default: derived from the file name)
+  -P, --prefix <name>  prefix the title with a workstream name, so
+                       01-CD-1234-a-task.md -P my-project becomes
+                       my-project-CD-1234-a-task
   -s, --split          split the current window   (DEFAULT)
   -H, --horizontal     make that split side by side
   -V, --vertical       make that split stacked      (DEFAULT)

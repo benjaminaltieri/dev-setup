@@ -109,6 +109,28 @@ hd "cldp: existing title -> resume, and do NOT resend the prompt"
 r="$(run "$MSG_KNOWN" cldp docs/01-framework.md)"
 [[ "$r" == "--resume framework" ]] && ok "resumes without re-tagging ($r)" || bad "expected bare '--resume framework', got: $r"
 
+hd "cldp: --prefix names the workstream"
+r="$(run "$MSG_UNKNOWN" cldp -P my-project docs/01-framework.md)"
+[[ "$r" == *"-n my-project-framework"* ]] && ok "prefix joined with a hyphen ($r)" || bad "got: $r"
+r="$(run "$MSG_UNKNOWN" cldp --prefix my-project docs/01-framework.md)"
+[[ "$r" == *"-n my-project-framework"* ]] && ok "long form works" || bad "long form: $r"
+# a trailing separator on the prefix must not double up
+r="$(run "$MSG_UNKNOWN" cldp -P 'my-project-' docs/01-framework.md)"
+[[ "$r" == *"-n my-project-framework"* ]] && ok "trailing separator trimmed" || bad "got: $r"
+# the prefix must reach the title, not be forwarded to claude
+[[ "$r" == *"--prefix"* ]] && bad "--prefix leaked through to claude" || ok "--prefix consumed, not forwarded"
+r="$(run "$MSG_UNKNOWN" cldp -P 'has spaces' docs/01-framework.md)"
+[[ "$r" == "<not launched>" ]] && ok "a prefix with whitespace is refused" || bad "launched: $r"
+
+hd "cldp: --title, and how it combines with --prefix"
+r="$(run "$MSG_UNKNOWN" cldp -t explicit-name docs/01-framework.md)"
+[[ "$r" == *"-n explicit-name"* ]] && ok "--title overrides the derived title ($r)" || bad "got: $r"
+r="$(run "$MSG_UNKNOWN" cldp -P my-project -t explicit-name docs/01-framework.md)"
+[[ "$r" == *"-n my-project-explicit-name"* ]] && ok "prefix applies to --title too" || bad "got: $r"
+# the title still decides resume-vs-create, so the probe must use the final one
+run "$MSG_KNOWN" cldp -P my-project docs/01-framework.md >/dev/null
+[[ "$(<$B/probe)" == *"--resume my-project-framework"* ]] && ok "the probe checks the prefixed title" || bad "probe used: $(<$B/probe)"
+
 hd "cldp: model variants"
 r="$(run "$MSG_UNKNOWN" cldn docs/01-framework.md)"
 [[ "$r" == *"--model sonnet"* ]] && ok "cldn -> sonnet ($r)" || bad "cldn: $r"

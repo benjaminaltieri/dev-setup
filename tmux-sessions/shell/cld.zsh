@@ -52,6 +52,23 @@ _cld_title_from_path() {
   print -r -- "$base"
 }
 
+# --- prefix a derived title --------------------------------------------------
+# Prompt file names are often just a ticket id and a terse description, which is
+# hard to pick out of a session list later. A prefix names the workstream:
+#   01-CD-1234-a-ticket-task.md  --prefix my-project
+#     -> my-project-CD-1234-a-ticket-task
+# A trailing separator on the prefix is trimmed so it cannot double up.
+_cld_apply_prefix() {
+  emulate -L zsh
+  local prefix="$1" title="$2"
+  if [[ -z "$prefix" ]]; then
+    print -r -- "$title"
+    return 0
+  fi
+  prefix="${prefix%%[-_.]}"
+  print -r -- "${prefix}-${title}"
+}
+
 # --- shared launcher ---------------------------------------------------------
 # _cld_launch <title> <model|""> <prompt|""> <force_new> [claude args...]
 _cld_launch() {
@@ -131,15 +148,22 @@ _cld_prompt_session() {
 
   local model="$1"; shift
   local fn="${funcstack[2]:-cldp}"
-  local force_new=0
+  local force_new=0 prefix="" title_override=""
 
   while (( $# )); do
     case "$1" in
       -n|--new) force_new=1; shift ;;
+      -P|--prefix) prefix="${2?--prefix needs a value}"; shift 2 ;;
+      -t|--title)  title_override="${2:?--title needs a value}"; shift 2 ;;
       -h|--help)
         print -r -- "usage: $fn <prompt-file> [claude args...]"
         print -r -- "         title  = file name, minus directory, extension and a leading ordinal"
         print -r -- "         kickoff= the session opens with '@<the path you gave>'"
+        print -r -- "       $fn -P <prefix> <prompt-file>"
+        print -r -- "         prefix the title with a workstream name, so"
+        print -r -- "         01-CD-1234-a-task.md -P my-project -> my-project-CD-1234-a-task"
+        print -r -- "       $fn -t <title> <prompt-file>"
+        print -r -- "         set the title outright, ignoring the file name and any prefix"
         print -r -- "       $fn -n <prompt-file>   always start a new session"
         print -r -- ""
         print -r -- "  cldp  default model     cldo  opus"
@@ -165,11 +189,23 @@ _cld_prompt_session() {
     return 2
   fi
 
-  local title="$(_cld_title_from_path "$pfile")"
-  if [[ -z "$title" ]]; then
-    print -ru2 -- "$fn: could not derive a title from: $pfile"
+  if [[ "$prefix" == (*/*|*[[:space:]]*) ]]; then
+    print -ru2 -- "$fn: invalid prefix: $prefix"
     return 2
   fi
+
+  local title="$title_override"
+  if [[ -z "$title" ]]; then
+    title="$(_cld_title_from_path "$pfile")"
+    if [[ -z "$title" ]]; then
+      print -ru2 -- "$fn: could not derive a title from: $pfile"
+      return 2
+    fi
+  fi
+  # Prefixing is orthogonal to where the title came from, so it applies to an
+  # explicit --title too. cld-spawn therefore passes a final --title and never
+  # --prefix, or the prefix would land twice.
+  title="$(_cld_apply_prefix "$prefix" "$title")"
 
   # @-mentions are whitespace delimited, so a path containing spaces would be
   # truncated at the first one.

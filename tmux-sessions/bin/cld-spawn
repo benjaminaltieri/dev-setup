@@ -45,7 +45,7 @@ HERE="${0:A:h:h}"
 
 dir="" model="opus" effort="high" title="" split=1 switch=0 dry=0
 # tmux's own naming: -h puts the new pane beside the old one, -v below it.
-orient="" orient_desc="stacked" anchor_override="" pane_id_only=0
+orient="" orient_desc="stacked" anchor_override="" pane_id_only=0 prefix=""
 
 while (( $# )); do
   case "$1" in
@@ -53,6 +53,7 @@ while (( $# )); do
     -m|--model)  model="${2?--model needs a value ('' to omit)}"; shift 2 ;;
     -e|--effort) effort="${2?--effort needs a value ('' to omit)}"; shift 2 ;;
     -t|--title)  title="${2:?--title needs a name}"; shift 2 ;;
+    -P|--prefix) prefix="${2?--prefix needs a value}"; shift 2 ;;
     -s|--split)  split=1; shift ;;
     -H|--horizontal) orient="-h"; orient_desc="side by side"; split=1; shift ;;
     -V|--vertical)   orient="-v"; orient_desc="stacked";      split=1; shift ;;
@@ -97,10 +98,20 @@ fi
 
 [[ -n "$title" ]] || title="$(_cld_title_from_path "$abs_file")"
 [[ -n "$title" ]] || die "could not derive a title from: $pfile"
+case "$prefix" in
+  */*|*[[:space:]]*) die "invalid prefix: $prefix" ;;
+esac
+title="$(_cld_apply_prefix "$prefix" "$title")"
 
 # Build the command the new pane will run. cldp resolves resume-vs-create and
 # does the @-tagging; everything after the path is passed through to claude.
-cmd="cldp ${(q)ref}"
+# Order matters: cldp parses its own flags before the path and forwards
+# everything after it to claude, so --prefix has to come first.
+# The title is resolved here (derived, prefixed, or given with -t) and handed to
+# cldp outright, so the tmux window name and the session title cannot disagree.
+# Order matters: cldp parses its own flags before the path and forwards
+# everything after it to claude.
+cmd="cldp --title ${(q)title} ${(q)ref}"
 [[ -n "$model"  ]] && cmd+=" --model ${(q)model}"
 [[ -n "$effort" ]] && cmd+=" --effort ${(q)effort}"
 
