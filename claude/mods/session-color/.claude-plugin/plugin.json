@@ -1,0 +1,6 @@
+{
+  "name": "session-color",
+  "version": "0.1.0",
+  "description": "Sets the session's prompt-bar color from its work stage: code-detected facts plus a cheap Haiku judgment, with manual /color overrides",
+  "author": { "name": "Ben Altieri" }
+}

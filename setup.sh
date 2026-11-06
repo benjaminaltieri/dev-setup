@@ -141,6 +141,14 @@ if [[ -x "$SCRIPT_DIR/tmux-sessions/install.sh" ]]; then
     "$SCRIPT_DIR/tmux-sessions/install.sh"
 fi
 
+# Claude Code mods: this repo is a plugin marketplace (.claude-plugin/marketplace.json).
+# A folder marketplace is read in place, so edits here take effect with /reload-plugins.
+if command -v claude >/dev/null 2>&1 && [[ -f "$SCRIPT_DIR/.claude-plugin/marketplace.json" ]]; then
+    echo "Installing Claude Code mods..."
+    claude plugin marketplace add "$SCRIPT_DIR" >/dev/null 2>&1 || echo "dev-setup marketplace already added"
+    claude plugin install session-color@dev-setup --scope user || echo "session-color: install by hand (see claude/mods/session-color/README.md)"
+fi
+
 # End home folder modifications
 popd > /dev/null
 

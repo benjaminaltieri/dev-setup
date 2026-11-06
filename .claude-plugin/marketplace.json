@@ -1,0 +1,11 @@
+{
+  "name": "dev-setup",
+  "owner": { "name": "Ben Altieri" },
+  "plugins": [
+    {
+      "name": "session-color",
+      "source": "./claude/mods/session-color",
+      "description": "Sets the session's prompt-bar color from its work stage"
+    }
+  ]
+}
