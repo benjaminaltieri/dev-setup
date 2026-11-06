@@ -1,11 +1,18 @@
 {
   "name": "dev-setup",
-  "owner": { "name": "Ben Altieri" },
+  "owner": {
+    "name": "Ben Altieri"
+  },
   "plugins": [
     {
       "name": "session-color",
       "source": "./claude/mods/session-color",
       "description": "Sets the session's prompt-bar color from its work stage"
+    },
+    {
+      "name": "auto-continue",
+      "source": "./claude/mods/auto-continue",
+      "description": "Sends continue for you, with backoff and a retry cap, when a turn dies on a network API error (EPROTO, connection lost mid-response)"
     }
   ]
 }

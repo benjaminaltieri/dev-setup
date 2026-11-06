@@ -1,0 +1,5 @@
+{
+  "name": "auto-continue",
+  "version": "0.1.0",
+  "description": "Automatically sends a continue prompt, with backoff and a retry cap, when a turn dies on a network/TLS API error (EPROTO, connection lost mid-response, no response)."
+}
