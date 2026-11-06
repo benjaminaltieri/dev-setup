@@ -6,6 +6,8 @@
 	<true/>
 	<key>AboutToPasteTabsWithCancel_selection</key>
 	<integer>2</integer>
+	<key>ClaudeCodeWorkgroupUpsellSuppressed</key>
+	<true/>
 	<key>Default Bookmark Guid</key>
 	<string>8B0BD435-4157-43CD-AC76-13CF2EA198F9</string>
 	<key>HapticFeedbackForEsc</key>

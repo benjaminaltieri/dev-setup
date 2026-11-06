@@ -20,6 +20,8 @@
 #                          spawn can stack under the first (pass the pane id the
 #                          previous run printed)
 #     -S, --switch         jump to it now (default: leave the user where they are)
+#         --no-color       do not turn on the session-color mod (use for automated
+#                          review sessions; they keep the default prompt color)
 #         --pane-id        print only the new pane's id, for chaining with -T
 #         --dry-run        print what would happen, change nothing
 #
@@ -33,6 +35,12 @@
 # starts one, and kicks it off by @-tagging the prompt file. Panes inherit the
 # tmux server's environment rather than the caller's, so the spawned session is a
 # normal top-level session even when launched from inside another agent.
+#
+# Spawned sessions launch with CC_SESSION_COLOR=on, which turns on the
+# session-color mod (session-color@dev-setup): the session starts yellow and the
+# mod moves the color with the work stage from then on. Because a new pane gets
+# the tmux server's environment, not the caller's, the variable is set on the
+# pane itself (tmux -e). --no-color leaves it unset, for review sessions.
 
 emulate -L zsh
 setopt no_nomatch
@@ -43,7 +51,7 @@ die() { print -ru2 -- "$SELF: $*"; exit 1; }
 HERE="${0:A:h:h}"
 [[ -r "$HERE/shell/cld.zsh" ]] && source "$HERE/shell/cld.zsh"
 
-dir="" model="opus" effort="high" title="" split=1 switch=0 dry=0
+dir="" model="opus" effort="high" title="" split=1 switch=0 dry=0 color=1
 # tmux's own naming: -h puts the new pane beside the old one, -v below it.
 orient="" orient_desc="stacked" anchor_override="" pane_id_only=0 prefix=""
 
@@ -65,9 +73,10 @@ while (( $# )); do
                  [[ -n "$anchor_override" ]] || die "--target was given an empty pane id"
                  shift 2 ;;
     -S|--switch) switch=1; shift ;;
+    --no-color)  color=0; shift ;;
     --pane-id)   pane_id_only=1; shift ;;
     --dry-run)   dry=1; shift ;;
-    -h|--help)   sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help)   sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     --)          shift; break ;;
     -*)          die "unknown option: $1" ;;
     *)           break ;;
@@ -109,15 +118,17 @@ title="$(_cld_apply_prefix "$prefix" "$title")"
 # everything after it to claude, so --prefix has to come first.
 # The title is resolved here (derived, prefixed, or given with -t) and handed to
 # cldp outright, so the tmux window name and the session title cannot disagree.
-# Order matters: cldp parses its own flags before the path and forwards
-# everything after it to claude.
 cmd="cldp --title ${(q)title} ${(q)ref}"
 [[ -n "$model"  ]] && cmd+=" --model ${(q)model}"
 [[ -n "$effort" ]] && cmd+=" --effort ${(q)effort}"
 
+typeset -a envflag
+(( color )) && envflag=(-e CC_SESSION_COLOR=on)
+color_desc="$( (( color )) && print -n 'on (CC_SESSION_COLOR=on)' || print -n 'off (--no-color)' )"
+
 if [[ -z "${TMUX:-}" ]]; then
   print -ru2 -- "$SELF: not inside tmux; run this from a tmux pane, or start the session yourself with:"
-  print -r  -- "  cd ${(q)abs_dir} && $cmd"
+  print -r  -- "  cd ${(q)abs_dir} && $( (( color )) && print -n 'CC_SESSION_COLOR=on ' )$cmd"
   exit 1
 fi
 
@@ -140,13 +151,14 @@ if (( dry )); then
   print -r -- "  run:    $cmd"
   print -r -- "  model:  ${model:-<inherited>}"
   print -r -- "  effort: ${effort:-<inherited>}"
+  print -r -- "  color:  $color_desc"
   print -r -- "  anchor: $anchor ($(tmux display-message -p -t "$anchor" '#{window_index}/#{window_name}'))"
   exit 0
 fi
 
 if (( split )); then
   typeset -a sflag; [[ -n "$orient" ]] && sflag=("$orient")
-  pane="$(tmux split-window -d -P -F '#{pane_id}' "${sflag[@]}" -t "$anchor" -c "$abs_dir")" \
+  pane="$(tmux split-window -d -P -F '#{pane_id}' "${sflag[@]}" "${envflag[@]}" -t "$anchor" -c "$abs_dir")" \
     || die "could not split the window"
   target="$pane"
   where="a $orient_desc split of window $(tmux display-message -p -t "$pane" '#{window_index}') ($(tmux display-message -p -t "$pane" '#{window_name}'))"
@@ -154,7 +166,7 @@ else
   # new-window takes a window target, not a pane target: anchor to the calling
   # pane's *window* so the new one is inserted right after it.
   anchor_win="$(tmux display-message -p -t "$anchor" '#{window_id}')"
-  pane="$(tmux new-window -d -P -F '#{pane_id}' -a -t "$anchor_win" -n "$title" -c "$abs_dir")" \
+  pane="$(tmux new-window -d -P -F '#{pane_id}' "${envflag[@]}" -a -t "$anchor_win" -n "$title" -c "$abs_dir")" \
     || die "could not create a window"
   target="$pane"
   where="window $(tmux display-message -p -t "$pane" '#{window_index}') ($title)"
@@ -178,4 +190,5 @@ print -r  -- "  cwd:    $abs_dir"
 print -r  -- "  prompt: @$ref"
 [[ -n "$model"  ]] && print -r -- "  model:  $model"
 [[ -n "$effort" ]] && print -r -- "  effort: $effort"
+print -r  -- "  color:  $color_desc"
 print -r  -- "  jump:   tmux select-window -t $target"

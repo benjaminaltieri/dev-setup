@@ -60,9 +60,9 @@
     sur = "submodule update --init --recursive"
     suno = "status -uno"
     update = "!f(){ git fetch origin; git reset --hard origin/$(git bname); }; f"
-    wta = "worktree add .trees/${1} benaltieri/${1}"
-    wtr = "worktree remove .trees/${1}"
-    wtrf = "worktree remove -f .trees/${1}"
+    wta = "!f(){ git worktree add .trees/$1 benaltieri/$1; }; f"
+    wtr = "!f(){ git wtvenv .trees/$1; git worktree remove .trees/$1; }; f"
+    wtrf = "!f(){ git wtvenv .trees/$1; git worktree remove -f .trees/$1; }; f"
 [push]
     default = current
 [color]

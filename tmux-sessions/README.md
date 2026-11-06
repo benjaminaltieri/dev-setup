@@ -70,6 +70,15 @@ the prefix reverted to `C-b`, which also breaks `C-a C-r` itself.
 - **Prompt files differing only by their ordinal prefix collide** into one title
   (`01-plan.md` and `02-plan.md` both give `plan`), and `cldp` will resume the
   first rather than start the second.
+- **`cld-spawn` turns on the session-color mod** (`session-color@dev-setup`,
+  source in `../claude/mods/session-color/`) by creating the pane with
+  `-e CC_SESSION_COLOR=on`; exporting it in your own shell would not reach the
+  pane, which inherits the tmux server's environment. The session starts yellow
+  and the mod handles every later color change, so nobody runs `/color` by hand.
+  `--no-color` leaves it off, for automated review sessions (they and
+  hand-started coordinator sessions keep the default color); `--dry-run` prints
+  a `color:` line either way. Headless runs are ignored by the mod, so the
+  `cldp` title probe is unaffected.
 
 ## Codex sessions (`cdx-spawn`)
 
