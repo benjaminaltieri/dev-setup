@@ -21,7 +21,7 @@ if [[ "${1:-}" == "--uninstall" ]]; then
   echo "Uninstalling tmux session tooling..."
   launchctl unload "$PLIST_DEST" 2>/dev/null || true
   rm -f "$PLIST_DEST"; say "removed the snapshot timer"
-  for b in tmux-snap tmux-restore cld-spawn; do rm -f "$HOME/.local/bin/$b"; done
+  for b in tmux-snap tmux-restore cld-spawn cdx-spawn; do rm -f "$HOME/.local/bin/$b"; done
   say "removed ~/.local/bin symlinks"
   say "left alone: ~/.zshrc source line, byobu config, and ~/.config/tmux-snap snapshots"
   exit 0
@@ -31,10 +31,10 @@ echo "Installing tmux session tooling from $HERE"
 
 # 1. commands on PATH
 mkdir -p "$HOME/.local/bin"
-for b in tmux-snap tmux-restore cld-spawn; do
+for b in tmux-snap tmux-restore cld-spawn cdx-spawn; do
   ln -sfn "$HERE/bin/$b" "$HOME/.local/bin/$b"
 done
-say "linked tmux-snap, tmux-restore, cld-spawn into ~/.local/bin"
+say "linked tmux-snap, tmux-restore, cld-spawn, cdx-spawn into ~/.local/bin"
 
 # 2. shell functions (clds, cldp, cldn/cldo/cldf), appended rather than copied so
 #    an existing .zshrc is never clobbered
@@ -73,4 +73,4 @@ say "installed and loaded the 5-minute snapshot timer"
 
 echo
 echo "Done. Open a new shell, or: source ~/.zshrc"
-echo "Verify with: clds -h ; cld-spawn -h ; tmux-snap --stdout | head -3"
+echo "Verify with: clds -h ; cld-spawn -h ; cdx-spawn -h ; tmux-snap --stdout | head -3"

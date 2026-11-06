@@ -1,0 +1,310 @@
+#!/usr/bin/env zsh
+# cdx-spawn - start a NAMED Codex CLI session in a new tmux window or split.
+#
+# The Codex counterpart of cld-spawn: an agent (or you) with a prompt file hands
+# the work to a real interactive Codex session in a pane the user can switch to.
+#
+#   cdx-spawn [options] <prompt-file> [codex args...]
+#
+#     -d, --dir <dir>      working directory (default: the prompt file's directory)
+#     -m, --model <name>   Codex model   (default: $CDX_SPAWN_MODEL, else gpt-6.1-sol)
+#     -e, --effort <lvl>   low | medium | high | xhigh | max | ultra
+#                          (default: $CDX_SPAWN_EFFORT, else high)
+#     -t, --title <name>   session name (default: derived from the file name)
+#     -P, --prefix <name>  prefix the name with a workstream, as in cld-spawn
+#     -s, --split          split the current window (default)
+#     -H, --horizontal     make that split side by side
+#     -V, --vertical       make that split stacked (default)
+#     -w, --window         make a new window instead
+#     -T, --target <pane>  split THAT pane instead of the calling one
+#     -S, --switch         jump to it now (default: leave the user where they are)
+#         --pane-id        print only the new pane's id, for chaining with -T
+#         --no-wait        name the session in the background and return at once
+#         --timeout <sec>  how long to wait for the first turn (default: 30)
+#         --dry-run        print what would happen, change nothing
+#
+#   Anything after the prompt file goes to codex verbatim (e.g. -s workspace-write).
+#
+# Exit status: 0 started and named, or PENDING on Codex's folder-trust question
+# (asked once per new directory; the name is applied once Ben answers it);
+# 1 usage or tmux error; 3 started but not named yet (a background namer keeps
+# trying for 30 minutes; if it gives up, type `/rename <title>` in the pane).
+#
+# How naming works. Codex has no launch flag for a session name. This script
+# never types into the Codex TUI: a keystroke can land in a dialog instead (the
+# 0.166 trust dialog has "Trust and continue" preselected). Instead, bin/
+# cdx-name-thread asks a private `codex app-server` over JSON-RPC for the thread
+# this session started (same cwd, first message = the kickoff, created after the
+# spawn) and sets its name with thread/name/set. A thread exists only once the
+# first message is submitted, so that wait also covers a trust question or a slow
+# MCP startup. Verified on codex-cli 0.166.0: the name survives Codex's own
+# auto-titling and resolves in `codex resume` and `codex queue --thread`. The
+# running TUI never learns it, so its status line does not show the name.
+#
+# check_for_update_on_startup=false is passed to every session: an update notice
+# is a blocking menu, and an unattended spawn would sit behind it.
+#
+# The model is pinned for the same reason cld-spawn pins one: the config default
+# moves (the desktop app rewrites it), and a model the installed CLI's model list
+# does not offer fails every turn with model_not_found (seen on 0.146 with
+# gpt-6.1-sol, fixed by updating the CLI). Pass -m '' or -e '' to omit the flag
+# and take the config default.
+#
+# Panes are labelled with @cdx_name, NOT @cc_name/@cc_sid, so tmux-snap records
+# them as plain panes and tmux-restore never tries to `claude --resume` a Codex
+# name. To reopen one after a restore: `codex resume <title>` in that pane.
+
+emulate -L zsh
+setopt no_nomatch
+zmodload zsh/datetime
+
+SELF="${0:t}"
+die() { print -ru2 -- "$SELF: $*"; exit 1; }
+
+HERE="${0:A:h:h}"
+# Title derivation and prefixing are shared with the cld family so both tools
+# name sessions identically.
+[[ -r "$HERE/shell/cld.zsh" ]] && source "$HERE/shell/cld.zsh" 2>/dev/null
+(( $+functions[_cld_title_from_path] )) || die "cannot load $HERE/shell/cld.zsh"
+
+dir="" model="${CDX_SPAWN_MODEL-gpt-6.1-sol}" effort="${CDX_SPAWN_EFFORT-high}"
+title="" prefix="" split=1 switch=0 dry=0 wait=1 timeout=30
+orient="" orient_desc="stacked" anchor_override="" pane_id_only=0
+
+while (( $# )); do
+  case "$1" in
+    -d|--dir)    dir="${2:?--dir needs a path}"; shift 2 ;;
+    -m|--model)  model="${2?--model needs a value ('' to omit)}"; shift 2 ;;
+    -e|--effort) effort="${2?--effort needs a value ('' to omit)}"; shift 2 ;;
+    -t|--title)  title="${2:?--title needs a name}"; shift 2 ;;
+    -P|--prefix) prefix="${2?--prefix needs a value}"; shift 2 ;;
+    -s|--split)  split=1; shift ;;
+    -H|--horizontal) orient="-h"; orient_desc="side by side"; split=1; shift ;;
+    -V|--vertical)   orient="-v"; orient_desc="stacked";      split=1; shift ;;
+    -w|--window) split=0; shift ;;
+    -T|--target) anchor_override="${2?--target needs a pane id}"
+                 # An empty value must not fall back to the caller's pane: a chain
+                 # whose previous step failed passes -T "" and would otherwise
+                 # silently reparent the rest onto the caller.
+                 [[ -n "$anchor_override" ]] || die "--target was given an empty pane id"
+                 shift 2 ;;
+    -S|--switch) switch=1; shift ;;
+    --pane-id)   pane_id_only=1; shift ;;
+    --no-wait)   wait=0; shift ;;
+    --timeout)   timeout="${2:?--timeout needs seconds}"; shift 2 ;;
+    --dry-run)   dry=1; shift ;;
+    -h|--help)   sed -n '2,32p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --)          shift; break ;;
+    -*)          die "unknown option: $1" ;;
+    *)           break ;;
+  esac
+done
+
+pfile="$1"
+[[ -n "$pfile" ]] || die "usage: $SELF [options] <prompt-file> [codex args...]"
+[[ -f "$pfile" ]] || die "not a file: $pfile"
+shift
+typeset -a passthrough=("$@")
+
+case "$effort" in
+  ''|low|medium|high|xhigh|max|ultra) ;;
+  *) die "effort must be one of: low medium high xhigh max ultra (got '$effort')" ;;
+esac
+[[ "$timeout" == <-> ]] || die "--timeout must be whole seconds (got '$timeout')"
+
+abs_file="${pfile:A}"
+[[ -n "$dir" ]] || dir="${abs_file:h}"
+[[ -d "$dir" ]] || die "not a directory: $dir"
+abs_dir="${dir:A}"
+
+# Reference the prompt file relative to the session's working directory when it
+# lives underneath it, so the kickoff reads the way a human would write it.
+if [[ "$abs_file" == "$abs_dir"/* ]]; then
+  ref="${abs_file#$abs_dir/}"
+else
+  ref="$abs_file"
+fi
+
+[[ -n "$title" ]] || title="$(_cld_title_from_path "$abs_file")"
+[[ -n "$title" ]] || die "could not derive a title from: $pfile"
+case "$prefix" in
+  */*|*[[:space:]]*) die "invalid prefix: $prefix" ;;
+esac
+title="$(_cld_apply_prefix "$prefix" "$title")"
+# A name with spaces is awkward to `codex resume` or `codex queue` from a shell.
+[[ "$title" == *[[:space:]]* ]] && die "title must not contain whitespace: '$title'"
+
+codex_home="${CODEX_HOME:-$HOME/.codex}"
+index="$codex_home/session_index.jsonl"
+
+# Codex does not keep names unique, and `codex resume <name>` with two matches is
+# ambiguous. The index is append-only (a rename appends), so the latest entry per
+# thread id is its current name.
+if [[ -r "$index" ]] && (( $+commands[jq] )); then
+  dupes="$(jq -rs --arg t "$title" \
+    'group_by(.id) | map(last) | map(select(.thread_name == $t)) | length' \
+    "$index" 2>/dev/null)"
+  [[ "$dupes" == <1-> ]] && \
+    print -ru2 -- "$SELF: warning: $dupes existing Codex session(s) already named '$title'; 'codex resume $title' will be ambiguous"
+fi
+
+# Codex does not expand @path in a command-line prompt the way the TUI composer
+# does, so the kickoff names the file in words. It also carries the session name:
+# that makes each spawn's first message unique, which is how cdx-name-thread
+# tells this session's thread from another spawn of the same brief in the same
+# directory (a stalled spawn's background namer would otherwise claim the next
+# one), and it tells Codex the name peers reach it by (`codex queue --thread`).
+kickoff="Read the session brief at ${ref} and follow it. Your session name is ${title}."
+
+typeset -a cdx=(codex -C "$abs_dir")
+[[ -n "$model"  ]] && cdx+=(-m "$model")
+[[ -n "$effort" ]] && cdx+=(-c "model_reasoning_effort=$effort")
+cdx+=(-c check_for_update_on_startup=false)
+cdx+=("${passthrough[@]}" "$kickoff")
+cmd="${(j: :)${(q-)cdx[@]}}"
+
+if [[ -z "${TMUX:-}" ]]; then
+  print -ru2 -- "$SELF: not inside tmux; run this from a tmux pane, or start the session yourself with:"
+  print -r  -- "  cd ${(q-)abs_dir} && $cmd"
+  print -r  -- "  (then name it: ${0:A:h}/cdx-name-thread --cwd ${(q-)abs_dir} --kickoff ${(q-)kickoff} --since \$(date +%s) --name $title)"
+  exit 1
+fi
+
+# Every tmux command here is anchored to an explicit pane. Untargeted tmux
+# commands act on the *globally active* pane, not the calling one.
+anchor="${anchor_override:-${TMUX_PANE:?cannot determine the calling pane}}"
+# display-message does NOT fail on a bad target, it silently falls back, so the
+# pane has to be checked against the real list.
+anchor_resolved="$(tmux display-message -p -t "$anchor" '#{pane_id}' 2>/dev/null)"
+if [[ -z "$anchor_resolved" ]] || ! tmux list-panes -a -F '#{pane_id}' | grep -qx -- "$anchor_resolved"; then
+  die "no such pane: $anchor"
+fi
+anchor="$anchor_resolved"
+
+if (( dry )); then
+  print -r -- "would create: $( (( split )) && print -n "a $orient_desc split of the current window" || print -n 'new window' ) for codex session '$title'"
+  print -r -- "  cwd:    $abs_dir"
+  print -r -- "  run:    $cmd"
+  print -r -- "  then:   name the new thread '$title' over codex app-server"
+  print -r -- "  model:  ${model:-<config default>}"
+  print -r -- "  effort: ${effort:-<config default>}"
+  print -r -- "  anchor: $anchor ($(tmux display-message -p -t "$anchor" '#{window_index}/#{window_name}'))"
+  exit 0
+fi
+
+if (( split )); then
+  typeset -a sflag; [[ -n "$orient" ]] && sflag=("$orient")
+  target="$(tmux split-window -d -P -F '#{pane_id}' "${sflag[@]}" -t "$anchor" -c "$abs_dir")" \
+    || die "could not split the window"
+  where="a $orient_desc split of window $(tmux display-message -p -t "$target" '#{window_index}') ($(tmux display-message -p -t "$target" '#{window_name}'))"
+else
+  # new-window takes a window target: anchor to the calling pane's window so the
+  # new one is inserted right after it.
+  anchor_win="$(tmux display-message -p -t "$anchor" '#{window_id}')"
+  target="$(tmux new-window -d -P -F '#{pane_id}' -a -t "$anchor_win" -n "$title" -c "$abs_dir")" \
+    || die "could not create a window"
+  where="window $(tmux display-message -p -t "$target" '#{window_index}') ($title)"
+fi
+
+tmux set-option -p -t "$target" @cdx_name "$title" 2>/dev/null
+
+# Only a thread created from now on can be this session's. One second of slack
+# because createdAt is whole seconds.
+since=$(( EPOCHSECONDS - 1 ))
+
+tmux send-keys -t "$target" "$cmd" Enter
+
+NAMER="${CDX_NAME_THREAD:-${0:A:h}/cdx-name-thread}"
+# Both wordings: 0.146 asked "Do you trust the contents of this directory?",
+# 0.166 shows a "Folder access" dialog asking "Trust this folder?".
+TRUST_RE='Trust this folder\?|Do you trust the contents of this directory'
+BG_WAIT="${CDX_SPAWN_BG_WAIT:-1800}"   # how long a background namer keeps trying
+
+_namer() {  # _namer <seconds>: prints the thread id; exit status from cdx-name-thread
+  "$NAMER" --cwd "$abs_dir" --kickoff "$kickoff" --since "$since" --name "$title" --timeout "$1"
+}
+
+# Reading the screen is safe; only typing into it is not.
+_screen_asks_trust() {
+  tmux capture-pane -p -t "$target" 2>/dev/null | grep -qE "$TRUST_RE"
+}
+
+# Detached namer. Its stdio MUST be detached: a background child still holding
+# the caller's stdout keeps a `$(cdx-spawn ...)` (or an agent's Bash tool)
+# blocked until it exits, which while a trust question waits on Ben can be half
+# an hour. A failure goes to the tmux status line, since nobody reads stderr.
+_name_in_background() {
+  ( _namer "$BG_WAIT" || tmux display-message -t "$target" \
+      "cdx-spawn: could not name the session '$title'; type /rename $title in it" ) \
+    </dev/null >/dev/null 2>&1 &!
+}
+
+rc=0 thread="" pending=""
+if (( wait )); then
+  # Run the namer alongside a watch on the screen, so a trust question is
+  # reported at once rather than after the whole timeout.
+  namer_out="$(mktemp -t cdx-spawn)"
+  # Started directly, NOT through _namer: backgrounding a function forks a
+  # subshell, so $! would be that subshell, and killing it on a trust question
+  # would orphan the namer, which could then claim (and misname) the thread of
+  # the next spawn of the same brief in the same directory.
+  "$NAMER" --cwd "$abs_dir" --kickoff "$kickoff" --since "$since" --name "$title" \
+    --timeout "$timeout" >"$namer_out" 2>&1 &
+  npid=$!
+  while kill -0 $npid 2>/dev/null; do
+    if _screen_asks_trust; then
+      kill $npid 2>/dev/null; wait $npid 2>/dev/null
+      pending=trust
+      break
+    fi
+    sleep 0.3
+  done
+  if [[ -z "$pending" ]]; then
+    wait $npid; rc=$?
+  fi
+  thread="$(<"$namer_out")"; rm -f "$namer_out"
+
+  if [[ "$pending" == trust ]]; then
+    # Not a failure: the session is fine once Ben answers. Name it afterwards.
+    _name_in_background
+    print -ru2 -- "$SELF: codex in $target is asking whether to trust $abs_dir; answer it there and '$title' is applied once codex starts"
+  elif (( rc == 2 )); then
+    pending=slow
+    _name_in_background
+    print -ru2 -- "$SELF: codex in $target has not started its first turn after ${timeout}s; naming continues in the background. Last lines:"
+    tmux capture-pane -p -t "$target" 2>/dev/null | grep -v '^[[:space:]]*$' | tail -6 | sed 's/^/    /' >&2
+    rc=3
+  elif (( rc != 0 )); then
+    print -ru2 -- "$SELF: could not name the session: ${thread:-cdx-name-thread exited $rc}"
+    print -ru2 -- "$SELF: the session is running unnamed; type '/rename $title' in it"
+    thread="" rc=3
+  fi
+else
+  _name_in_background
+fi
+
+(( switch )) && { tmux select-window -t "$target"; tmux select-pane -t "$target"; }
+
+if (( pane_id_only )); then
+  print -r -- "$target"
+  (( rc == 0 )) && exit 0 || exit 3
+fi
+
+print -r  -- "started codex '$title' in $where"
+print -r  -- "  cwd:    $abs_dir"
+print -r  -- "  prompt: $ref"
+print -r  -- "  model:  ${model:-<config default>}"
+print -r  -- "  effort: ${effort:-<config default>}"
+if [[ "$pending" == trust ]]; then
+  print -r -- "  name:   PENDING: answer codex's folder-trust question in the pane; '$title' is applied when codex starts"
+elif [[ "$pending" == slow ]]; then
+  print -r -- "  name:   PENDING: codex has not started yet; '$title' is applied in the background (see above)"
+elif (( ! wait )); then
+  print -r -- "  name:   being set in the background"
+elif (( rc == 0 )); then
+  print -r -- "  name:   $title (thread $thread; reopen with: codex resume $title)"
+else
+  print -r -- "  name:   NOT SET (see above)"
+fi
+print -r  -- "  jump:   tmux select-window -t $target"
+(( rc == 0 )) || exit 3
