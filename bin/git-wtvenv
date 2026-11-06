@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+"""Remove the poetry virtualenvs belonging to a worktree, before it is torn down.
+
+Poetry keys each virtualenv to a hash of the absolute project path, so a
+worktree gets its own ~800MB env that `git worktree remove` never touches.
+This walks every pyproject.toml in the tree (monorepo subpackages included,
+which is where qs-data-hub actually keys its envs) and removes the matching
+cache entries.
+
+usage: git wtvenv <worktree-path> [-n|--dry-run]
+"""
+import os, re, sys, base64, hashlib, shutil
+from pathlib import Path
+
+CACHE = Path.home() / "Library/Caches/pypoetry/virtualenvs"
+SKIP = ("/.venv/", "/node_modules/", "/site-packages/", "/.git/")
+
+
+def env_base(name: str, path: str) -> str:
+    s = re.sub(r'[ $`!*@"\\\r\n\t]', "_", name.lower())[:42]
+    n = os.path.normcase(os.path.realpath(path))
+    return f"{s}-{base64.urlsafe_b64encode(hashlib.sha256(n.encode()).digest()).decode()[:8]}"
+
+
+def proj_name(d: str):
+    f = Path(d) / "pyproject.toml"
+    if not f.is_file():
+        return None
+    t = f.read_text(errors="ignore")
+    m = re.search(r'^\s*\[(?:tool\.poetry|project)\]', t, re.M)
+    if not m:
+        return None
+    m2 = re.search(r'^\s*name\s*=\s*["\']([^"\']+)["\']', t[m.start():], re.M)
+    return m2.group(1) if m2 else None
+
+
+def main() -> int:
+    args = [a for a in sys.argv[1:] if not a.startswith("-")]
+    dry = any(a in ("-n", "--dry-run") for a in sys.argv[1:])
+    if not args:
+        print("usage: git wtvenv <worktree-path> [-n]", file=sys.stderr)
+        return 2
+    root = args[0]
+    if not os.path.isdir(root):
+        return 0
+    if not CACHE.is_dir():
+        return 0
+
+    freed, hits = 0, []
+    for dirpath, dirnames, files in os.walk(root):
+        if any(s in dirpath + "/" for s in SKIP):
+            dirnames[:] = []
+            continue
+        if "pyproject.toml" not in files:
+            continue
+        n = proj_name(dirpath)
+        if not n:
+            continue
+        base = env_base(n, dirpath)
+        for v in CACHE.glob(f"{base}-py*"):
+            if v.is_dir():
+                kb = sum(f.stat().st_size for f in v.rglob("*") if f.is_file()) // 1024
+                hits.append((v, kb))
+                freed += kb
+
+    for v, kb in hits:
+        print(f"{'would remove' if dry else 'removing'} {v.name}  ({kb/1048576:.2f} GB)")
+        if not dry:
+            shutil.rmtree(v, ignore_errors=True)
+    if hits:
+        print(f"{'would free' if dry else 'freed'} {freed/1048576:.2f} GB from {len(hits)} virtualenv(s)")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
